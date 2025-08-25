@@ -1,6 +1,8 @@
+import React from 'react';
+
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { login } from '../api/auth'
+import { login, getUserInfo } from '../../api/auth'
 
 export default function Login() {
     const [username, setUsername] = useState('')
@@ -14,12 +16,24 @@ export default function Login() {
         setLoading(true)
         setError('')
         try {
-        await login(username, password)
-        navigate('/dashboard') // need to do this page
+            await login(username.trim(), password)
+
+            const user = await getUserInfo() 
+
+            switch (user.role) {
+                case 'manager':
+                    navigate('/manager')
+                    break
+                case 'owner':
+                    navigate('/owner') 
+                    break
+                default:
+                    navigate('/employee')
+            }
         } catch (err) {
-        setError('Неверный логин или пароль')
+            setError('Неверный логин или пароль')
         } finally {
-        setLoading(false)
+            setLoading(false)
         }
     }
 
@@ -29,8 +43,9 @@ export default function Login() {
             <h1 className="text-2xl font-semibold text-center">Вход</h1>
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
-                <label className="block text-sm mb-1">Логин</label>
+                <label htmlFor="username" className="block text-sm mb-1">Логин</label>
                 <input
+                id="username"
                 className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
@@ -38,8 +53,9 @@ export default function Login() {
                 />
             </div>
             <div>
-                <label className="block text-sm mb-1">Пароль</label>
+                <label htmlFor="password" className="block text-sm mb-1">Пароль</label>
                 <input
+                id="password"
                 type="password"
                 className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
                 value={password}

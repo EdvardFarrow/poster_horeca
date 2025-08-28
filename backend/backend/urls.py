@@ -27,4 +27,5 @@ urlpatterns = [
     path('api/auth/', include('users.urls')), 
     path('api/', include(router.urls)), 
     path('api/', include('shift.urls')),
+    path('api/', include('poster_api.urls')),
 ]

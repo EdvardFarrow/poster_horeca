@@ -46,6 +46,8 @@ INSTALLED_APPS = [
     'backend',
     'users',
     'shift',
+    'salary',
+    'poster_api',
 ]
 
 MIDDLEWARE = [

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models
 from django.conf import settings
 
@@ -86,6 +87,14 @@ class Shift(models.Model):
         related_name='shifts_created',
         verbose_name="Создана менеджером"
     )
+    
+    revenue = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # общая выручка смены
+
+    def get_revenue_by_category(self, category):
+        return Decimal(0)
+
+    def get_revenue_by_product(self, product):
+        return Decimal(0)
 
     class Meta:
         verbose_name = "Смена"

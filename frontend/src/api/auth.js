@@ -7,6 +7,12 @@ const api = axios.create({
     headers: { 'Content-Type': 'application/json' },
 });
 
+export async function register({ username, password, fullname, role = 'employee' }) {
+    const { data } = await api.post('register/', { username, password, fullname, role });
+    return data;
+}
+
+
 export async function login(username, password) {
     const { data } = await api.post('login/', { username, password });
 
@@ -15,12 +21,24 @@ export async function login(username, password) {
     return data;
 }
 
-export async function register({ username, password, role = 'manager' }) {
-    const { data } = await api.post('register/', { username, password, role });
-    return data;
+export async function registerAndLogin({ username, password, fullname, role = 'employee' }) {
+    await register({ username, password, fullname, role }); 
+    return await login(username, password); 
 }
 
 export function logout() {
     localStorage.removeItem('access');
     localStorage.removeItem('refresh');
+}
+
+export async function getUserInfo() {
+    const token = localStorage.getItem('access');
+    if (!token) return null;
+
+    const { data } = await api.get('me/', {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return data;
 }

@@ -2,7 +2,7 @@ import React from 'react';
 
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { register as apiRegister } from '../../api/auth'
+import { registerAndLogin } from '../../api/auth'
 
 export default function Register() {
     const [username, setUsername] = useState('')
@@ -27,13 +27,13 @@ export default function Register() {
         }
 
         try {
-            await apiRegister({ 
+            await registerAndLogin({ 
                 username: username.trim(), 
                 password, 
                 fullname: fullname.trim(), 
                 role: 'employee'  
             })
-            navigate('/login')
+            navigate('/employee-dashboard')
         } catch (err) {
             if (err.response?.data?.detail) {
                 setError(err.response.data.detail)

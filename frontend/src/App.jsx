@@ -1,6 +1,8 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
-import Login from './pages/Login.jsx'
-import Register from './pages/Register.jsx'
+import { Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login/Login.jsx';
+import Register from './pages/Register/Register.jsx';
+import OwnerDashboard from './pages/OwnerDashboard/OwnerDashboard';
+import ProtectedEmployeeDashboard from './pages/EmployeeDashboard/ProtectedEmployeeDashboard';
 
 function NotFound() {
   return (
@@ -20,6 +22,7 @@ export default function App() {
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/employeedashboard" element={<ProtectedEmployeeDashboard />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   )

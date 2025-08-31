@@ -3,12 +3,18 @@ from django.contrib.auth.models import AbstractUser
 
 class User(AbstractUser):
     ROLE_CHOICES = (
-        ('owner', 'Владелец'),
+        ('owner', 'Управляющий'),
         ('manager', 'Менеджер'),
-        ('employee', 'Сотрудник')
+        ('employee', 'Сотрудник'),
+        ('waiter', 'Официант'),
+        ('bartender', 'Бармен'),
+        ('cook', 'Повар'),
+        ('hookah', 'Кальянщик'),
+        ('cleaner', 'Уборщик'),
+        ('trainee', 'Стажер'), 
     )
     
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='manager')
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='trainee')
     fullname = models.CharField(max_length=150, blank=True)
 
     

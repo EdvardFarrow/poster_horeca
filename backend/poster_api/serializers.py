@@ -3,9 +3,9 @@ from rest_framework import serializers
 
 class FinanceSerializer(serializers.Serializer):
     sum = serializers.DecimalField(max_digits=12, decimal_places=2)
-    cost = serializers.DecimalField(max_digits=12, decimal_places=2)
     profit = serializers.DecimalField(max_digits=12, decimal_places=2)
     orders_count = serializers.IntegerField()
+
 
 
 class SalesSerializer(serializers.Serializer):
@@ -22,6 +22,7 @@ class ProductSerializer(serializers.Serializer):
     product_name = serializers.CharField()
     sum = serializers.DecimalField(max_digits=12, decimal_places=2)
     count = serializers.IntegerField()
+    price = serializers.IntegerField()
 
 
 class CategorySerializer(serializers.Serializer):
@@ -32,18 +33,18 @@ class CategorySerializer(serializers.Serializer):
 
 
 class ClientSerializer(serializers.Serializer):
-    client_id = serializers.IntegerField()
-    client_name = serializers.CharField(required=False, allow_null=True)
-    visits = serializers.IntegerField()
-    sum = serializers.DecimalField(max_digits=12, decimal_places=2)
+    name = serializers.CharField()
+    email = serializers.CharField(required=False, allow_null=True)
+    visits = serializers.IntegerField(source="transactions")
+    sum = serializers.DecimalField(max_digits=12, decimal_places=2, source="revenue")
     avg_check = serializers.DecimalField(max_digits=12, decimal_places=2)
 
 
 class EmployeeSerializer(serializers.Serializer):
-    employee_id = serializers.IntegerField()
-    employee_name = serializers.CharField()
-    orders_count = serializers.IntegerField()
-    sum = serializers.DecimalField(max_digits=12, decimal_places=2)
+    employee_id = serializers.IntegerField(source="id")
+    employee_name = serializers.CharField(source="name")
+    orders_count = serializers.IntegerField(source="transactions")
+    sum = serializers.DecimalField(max_digits=12, decimal_places=2, source="revenue")
     avg_check = serializers.DecimalField(max_digits=12, decimal_places=2)
 
 
@@ -61,8 +62,22 @@ class DepartmentSerializer(serializers.Serializer):
     orders_count = serializers.IntegerField()
 
 
-class AnalyticsResponseSerializer(serializers.Serializer):
+
+class RevenueProfitSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    count = serializers.FloatField(required=False)
+    revenue = serializers.FloatField(required=False)
+    profit = serializers.FloatField(required=False)
+    product_profit = serializers.FloatField(required=False)
+
     
+    
+    
+
+
+
+
+class AnalyticsResponseSerializer(serializers.Serializer):
     type = serializers.CharField()
     data = serializers.ListField()
 
@@ -70,21 +85,62 @@ class AnalyticsResponseSerializer(serializers.Serializer):
         type_ = instance.get("type")
         data = instance.get("data", [])
 
-        serializer_class_map = {
-            "finance": FinanceSerializer,
-            "sales": SalesSerializer,
-            "products": ProductSerializer,
-            "categories": CategorySerializer,
-            "clients": ClientSerializer,
-            "employees": EmployeeSerializer,
-            "discounts": DiscountSerializer,
-            "departments": DepartmentSerializer,
-        }
+        # Приведение к списку на случай, если пришёл один объект
+        if isinstance(data, dict):
+            data = [data]
 
-        serializer_class = serializer_class_map.get(type_)
-        if serializer_class:
-            serialized_data = serializer_class(data, many=True).data
+        if type_ == "products":
+            serialized_data = [
+                {
+                    "product_name": item.get("name", ""),
+                    "count": float(item.get("count", 0)),
+                    "product_profit": float(item.get("product_profit", 0)),
+                }
+                for item in data
+            ]
+        elif type_ == "categories":
+            serialized_data = [
+                {
+                    "category_name": item.get("name", ""),
+                    "count": float(item.get("count", 0)),
+                    "profit": float(item.get("profit", 0)),
+                }
+                for item in data
+            ]
+        elif type_ == "waiters":
+            serialized_data = [
+                {
+                    "employee_name": item.get("name", ""),
+                    "orders_count": int(item.get("transactions", 0)),
+                    "sum": float(item.get("revenue", 0)),
+                    "avg_check": float(item.get("avg_check", 0)),
+                    "profit": float(item.get("profit", 0)),
+                }
+                for item in data
+            ]
+        elif type_ == "clients":
+            serialized_data = [
+                {
+                    "name": item.get("name", ""),
+                    "email": item.get("email"),
+                    "visits": int(item.get("transactions", 0)),
+                    "sum": float(item.get("revenue", 0)),
+                    "avg_check": float(item.get("avg_check", 0)),
+                }
+                for item in data
+            ]
+        elif type_ == "workshops":
+            serialized_data = [
+                {
+                    "department_name": item.get("name", ""),
+                    "sum": round(int(item.get("sum", 0)) / 100, 2),
+                    "orders_count": int(item.get("count", 0)),
+                    "profit": round(int(item.get("profit", 0)) / 100, 2),
+                }
+                for item in data
+            ]    
         else:
+            # Для остальных типов просто возвращаем данные как есть
             serialized_data = data
 
         return {

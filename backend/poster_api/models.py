@@ -51,3 +51,18 @@ class AnalyticsRecord(models.Model):
     entity_id = models.IntegerField(null=True, blank=True)
     date = models.DateField()
     data = models.JSONField()  
+
+
+
+
+class CashShiftReport(models.Model):
+    poster_shift_id = models.CharField(max_length=100, unique=True)  
+    cash_start = models.DecimalField(max_digits=10, decimal_places=2, default=0)  
+    cash_end = models.DecimalField(max_digits=10, decimal_places=2, default=0)    
+    sales = models.DecimalField(max_digits=10, decimal_places=2, default=0)       
+    total_sales = models.DecimalField(max_digits=10, decimal_places=2, default=0) 
+    date_start = models.DateTimeField()  
+    date_end = models.DateTimeField(null=True, blank=True)  
+
+    def __str__(self):
+        return f"Кассовая смена {self.poster_shift_id} ({self.organization_id})"

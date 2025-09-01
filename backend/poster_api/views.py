@@ -1,15 +1,21 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
+
 from .client import PosterAPIClient
-from .serializers import AnalyticsResponseSerializer
+from .serializers import CashShiftSerializer, StatisticsResponseSerializer
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-class AnalyticsView(viewsets.ViewSet):
+class StatisticsView(viewsets.ViewSet):
     def list(self, request):
         type_ = request.query_params.get("type", "waiters")
         date_from = request.query_params.get("dateFrom")
         date_to = request.query_params.get("dateTo")
         entity_id = request.query_params.get("id")
+
+        logger.info(f"Received params: {request.query_params}")
 
         client = PosterAPIClient()
 
@@ -30,7 +36,28 @@ class AnalyticsView(viewsets.ViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            serializer = AnalyticsResponseSerializer({"type": type_, "data": raw_data})
+            serializer = StatisticsResponseSerializer({"type": type_, "data": raw_data})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+class CashShiftViewSet(viewsets.ViewSet):
+    def list(self, request):
+        date_from = request.query_params.get("dateFrom")
+        date_to = request.query_params.get("dateTo")
+        spot_id = request.query_params.get("spot_id") 
+
+        client = PosterAPIClient()
+        logger.info(f"Received params: {request.query_params}")
+        try:
+            raw_shifts = client.get_cash_shifts(date_from=date_from, date_to=date_to, spot_id=spot_id)
+
+            serializer = CashShiftSerializer(raw_shifts, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:

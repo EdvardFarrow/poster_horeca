@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 
+
 class FinanceSerializer(serializers.Serializer):
     sum = serializers.DecimalField(max_digits=12, decimal_places=2)
     profit = serializers.DecimalField(max_digits=12, decimal_places=2)
@@ -70,14 +71,12 @@ class RevenueProfitSerializer(serializers.Serializer):
     profit = serializers.FloatField(required=False)
     product_profit = serializers.FloatField(required=False)
 
-    
-    
-    
 
 
 
 
-class AnalyticsResponseSerializer(serializers.Serializer):
+
+class StatisticsResponseSerializer(serializers.Serializer):
     type = serializers.CharField()
     data = serializers.ListField()
 
@@ -147,3 +146,21 @@ class AnalyticsResponseSerializer(serializers.Serializer):
             "type": type_,
             "data": serialized_data
         }
+
+
+
+
+class CashShiftSerializer(serializers.Serializer):
+    poster_shift_id = serializers.CharField()
+    date_start = serializers.CharField()
+    date_end = serializers.CharField()
+    amount_start = serializers.FloatField()
+    amount_end = serializers.FloatField()
+    amount_debit = serializers.FloatField()
+    amount_sell_cash = serializers.FloatField()
+    amount_sell_card = serializers.FloatField()
+    amount_credit = serializers.FloatField()
+    amount_collection = serializers.FloatField  ()
+    user_id_start = serializers.CharField(allow_null=True, allow_blank=True)
+    user_id_end = serializers.CharField(allow_null=True, allow_blank=True)
+    comment = serializers.CharField(allow_null=True, allow_blank=True)

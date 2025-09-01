@@ -15,11 +15,12 @@ class PosterAPIClient:
         self.api_url = api_url or self.api_url
 
     def _format_date(self, date_str: str) -> str:
-            date_only = date_str.split("T")[0]
-            return datetime.datetime.strptime(date_only, "%Y-%m-%d").strftime("%Y%m%d")
+        if len(date_str) == 8 and date_str.isdigit():
+            return date_str
+        date_only = date_str.split("T")[0]
+        return datetime.datetime.strptime(date_only, "%Y-%m-%d").strftime("%Y%m%d")
 
     def make_request(self, method: str, endpoint: str, params: Optional[dict] = None) -> dict:
-        
         try:
             url = f"{self.api_url}{endpoint}"
             params = params or {}
@@ -170,3 +171,38 @@ class PosterAPIClient:
         return normalized
 
 
+    # ------------------ Reports ------------------
+    def get_cash_shifts(self, date_from: str = None, date_to: str = None, spot_id: int = None) -> List[dict]:
+        params = {}
+        if date_from:
+            params["dateFrom"] = self._format_date(date_from)
+        if date_to:
+            params["dateTo"] = self._format_date(date_to)
+        if spot_id:
+            params["spot_id"] = int(spot_id)
+
+        logger.info(f"CashShifts request params: {params}")
+        print(f"CashShifts request params: {params}")
+        response = self.make_request("GET", "finance.getCashShifts", params=params).get("response", [])
+
+        if not response:
+            return []
+
+        normalized = []
+        for shift in response:
+            normalized.append({
+                "poster_shift_id": shift.get("cash_shift_id"),
+                "date_start": shift.get("date_start"),
+                "date_end": shift.get("date_end"),
+                "amount_start": int(shift.get("amount_start", 0)) / 100,
+                "amount_end": int(shift.get("amount_end", 0)) / 100,
+                "amount_debit": int(shift.get("amount_debit", 0)) / 100,
+                "amount_sell_cash": int(shift.get("amount_sell_cash", 0)) / 100,
+                "amount_sell_card": int(shift.get("amount_sell_card", 0)) / 100,
+                "amount_credit": int(shift.get("amount_credit", 0)) / 100,
+                "amount_collection": int(shift.get("amount_collection", 0)) / 100,
+                "user_id_start": shift.get("user_id_start"),
+                "user_id_end": shift.get("user_id_end"),
+                "comment": shift.get("comment"),
+            })
+        return normalized   

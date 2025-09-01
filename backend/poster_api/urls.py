@@ -1,14 +1,21 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import AnalyticsView
+from .views import CashShiftViewSet, StatisticsView
 
-router = DefaultRouter()
-router.register(
-    r'analytics',
-    AnalyticsView,
-    basename='analytics'
+statistics_router = DefaultRouter()
+statistics_router.register(
+    r'statistics',
+    StatisticsView,
+    basename='statistics'
 )
 
+reports_router = DefaultRouter()
+reports_router.register(
+    r'cash_shifts',
+    CashShiftViewSet,
+    basename='cashshift')
+
 urlpatterns = [
-    path('', include(router.urls)),
+    path('', include(statistics_router.urls)),
+    path('', include(reports_router.urls)),
 ]

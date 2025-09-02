@@ -8,8 +8,9 @@ from rest_framework.permissions import IsAuthenticated
 
 
 
-from backend.salary.models import SalaryRecord
-from backend.salary.serializers import SalaryRecordSerializer
+from poster_api.client import PosterAPIClient
+from .models import SalaryRecord, SalaryRule
+from .serializers import PosterEmployeeSerializer, SalaryRecordSerializer, SalaryRuleSerializer
 
 class SalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = SalaryRecord.objects.all()
@@ -60,3 +61,22 @@ class SalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
             "shifts": formatted,
             "total_income": total
         })
+
+
+
+class PosterEmployeesViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        client = PosterAPIClient()
+        employees = client.get_employees()
+
+        serializer = PosterEmployeeSerializer(employees, many=True)
+        return Response(serializer.data)
+    
+    
+    
+class SalaryRuleViewSet(viewsets.ModelViewSet):
+    queryset = SalaryRule.objects.all()
+    serializer_class = SalaryRuleSerializer
+    permission_classes = [IsAuthenticated]      

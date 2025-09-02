@@ -21,9 +21,15 @@ class SalesSerializer(serializers.Serializer):
 class ProductSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
     product_name = serializers.CharField()
-    sum = serializers.DecimalField(max_digits=12, decimal_places=2)
+    sum = serializers.DecimalField(max_digits=12, decimal_places=2, source="payed_sum")
     count = serializers.IntegerField()
-    price = serializers.IntegerField()
+    price = serializers.DecimalField(max_digits=12, decimal_places=2, source="product_sum")
+    profit = serializers.DecimalField(max_digits=12, decimal_places=2)
+    
+class ShiftSalesSerializer(serializers.Serializer):
+    shift_id = serializers.IntegerField()
+    regular = ProductSerializer(many=True)
+    delivery = ProductSerializer(many=True)    
 
 
 class CategorySerializer(serializers.Serializer):
@@ -47,7 +53,6 @@ class EmployeeSerializer(serializers.Serializer):
     orders_count = serializers.IntegerField(source="transactions")
     sum = serializers.DecimalField(max_digits=12, decimal_places=2, source="revenue")
     avg_check = serializers.DecimalField(max_digits=12, decimal_places=2)
-
 
 class DiscountSerializer(serializers.Serializer):
     discount_id = serializers.IntegerField()

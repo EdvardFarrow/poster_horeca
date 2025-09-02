@@ -27,26 +27,13 @@ class SalaryRule(models.Model):
     rule_type = models.CharField(max_length=20, choices=RULE_TYPE_CHOICES)
 
     # Общие параметры
-    value = models.DecimalField(
-        max_digits=10, decimal_places=2,
-        help_text="Сумма (фиксированная) или процент"
-    )
+    value = models.DecimalField(max_digits=10, decimal_places=2,)
 
     # Для процента от категории
-    category = models.ForeignKey(
-        Category,
-        on_delete=models.CASCADE,
-        null=True, blank=True,
-        related_name="salary_rules"
-    )
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, null=True, blank=True,)
 
     # Для процента от конкретной позиции
-    product = models.ForeignKey(
-        Product,
-        on_delete=models.CASCADE,
-        null=True, blank=True,
-        related_name="salary_rules"
-    )
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True,)
 
     def __str__(self):
         return f"{self.employee} - {self.get_rule_type_display()} ({self.value})"

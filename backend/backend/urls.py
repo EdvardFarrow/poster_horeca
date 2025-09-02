@@ -28,4 +28,5 @@ urlpatterns = [
     path('api/', include(router.urls)), 
     path('api/', include('shift.urls')),
     path('api/', include('poster_api.urls')),
+    path('api/', include('salary.urls')),
 ]

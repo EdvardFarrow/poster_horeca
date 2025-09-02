@@ -1,4 +1,5 @@
-import datetime
+from collections import defaultdict
+from datetime import datetime
 from typing import Optional, List
 import requests
 from decouple import config
@@ -15,10 +16,12 @@ class PosterAPIClient:
         self.api_url = api_url or self.api_url
 
     def _format_date(self, date_str: str) -> str:
+        if isinstance(date_str, list):
+            date_str = date_str[0]
         if len(date_str) == 8 and date_str.isdigit():
             return date_str
         date_only = date_str.split("T")[0]
-        return datetime.datetime.strptime(date_only, "%Y-%m-%d").strftime("%Y%m%d")
+        return datetime.strptime(date_only, "%Y-%m-%d").strftime("%Y%m%d")
 
     def make_request(self, method: str, endpoint: str, params: Optional[dict] = None) -> dict:
         try:
@@ -206,3 +209,141 @@ class PosterAPIClient:
                 "comment": shift.get("comment"),
             })
         return normalized   
+
+
+
+
+
+    def get_employees(self) -> List[dict]:
+        data = self.make_request("GET", "access.getEmployees").get("response", [])
+        normalized = []
+        
+        for emp in data:
+            normalized.append({
+                "poster_id": emp.get("user_id"),
+                "name": emp.get("name"),
+                "role_id": emp.get("role_id"),
+                "role_name": emp.get("role_name"),
+                "phone": emp.get("phone"),
+                "access_mask": emp.get("access_mask"),
+                "user_type": emp.get("user_type"),
+                "last_in": emp.get("last_in"),
+            })
+        return normalized
+    
+    
+    # ------------------ Transactions ------------------
+    def get_transactions(
+        self,
+        date_from: str,
+        date_to: str,
+        spot_id: int = None,
+        include_products: bool = False,
+        include_delivery: bool = False
+    ) -> List[dict]:
+        params = {
+            "dateFrom": self._format_date(date_from),
+            "dateTo": self._format_date(date_to),
+            "status": 2,  # только закрытые
+            "include_products": str(include_products).lower(),
+            "include_delivery": str(include_delivery).lower(),
+            "type": "spots",
+        }
+        if spot_id:
+            params["id"] = spot_id
+
+        data = self.make_request("GET", "dash.getTransactions", params=params).get("response", [])
+        # Приведение времени к миллисекундам или float не требуется, API возвращает миллисекунды
+        return data
+
+
+    def get_transactions_products(self, transaction_ids: List[int]) -> List[dict]:
+        if not transaction_ids:
+            return []
+
+        params = {
+            "transactions_id": ",".join(map(str, transaction_ids))
+        }
+        data = self.make_request("GET", "dash.getTransactionsProducts", params=params).get("response", [])
+        return data
+
+    
+    
+    
+    
+    
+    
+    
+
+    def get_sales_by_shift_with_delivery(self, date: str, spot_id: int = None) -> dict:
+        # Получаем смены за дату
+        shifts_data = self.get_cash_shifts(date_from=date, date_to=date, spot_id=spot_id)
+        if not shifts_data:
+            return {}
+
+        shifts = []
+        for s in shifts_data:
+            start_dt = datetime.strptime(s['date_start'], "%Y-%m-%d %H:%M:%S")
+
+            # Если смена ещё не закрыта, ставим текущий момент
+            if s['date_end'] == '0000-00-00 00:00:00':
+                end_dt = datetime.now()
+            else:
+                end_dt = datetime.strptime(s['date_end'], "%Y-%m-%d %H:%M:%S")
+
+            shifts.append({
+                'id': s['poster_shift_id'],
+                'start_dt': start_dt,
+                'end_dt': end_dt
+            })
+
+        # Берём все транзакции за день
+        transactions_data = self.get_transactions(
+            date_from=date,
+            date_to=date,
+            spot_id=spot_id,
+            include_products=True,
+            include_delivery=True
+        )
+        if not transactions_data:
+            return {}
+
+        transaction_ids = [t['transaction_id'] for t in transactions_data]
+        products_data = self.get_transactions_products(transaction_ids)
+
+        result = {
+            shift['id']: {
+                'regular': defaultdict(lambda: {'product_id': None, 'product_name': None, 'count': 0, 'payed_sum': 0, 'profit': 0}),
+                'delivery': defaultdict(lambda: {'product_id': None, 'product_name': None, 'count': 0, 'payed_sum': 0, 'profit': 0})
+            }
+            for shift in shifts
+        }
+
+        transaction_mode = {t['transaction_id']: int(t.get('service_mode', 1)) for t in transactions_data}
+
+        for product in products_data:
+            product_time = datetime.fromtimestamp(int(product['time']) / 1000)
+            mode = transaction_mode.get(product['transaction_id'], 1)
+            category = 'delivery' if mode == 3 else 'regular'
+
+            for shift in shifts:
+                if shift['start_dt'] <= product_time <= shift['end_dt']:
+                    res = result[shift['id']][category][product['product_id']]
+                    if res['product_id'] is None:
+                        res['product_id'] = product['product_id']
+                        res['product_name'] = product['product_name']
+
+                    res['count'] += float(product['num'])
+                    res['payed_sum'] += float(product['payed_sum']) 
+                    res['product_sum'] = float(product['product_sum']) 
+                    res['profit'] += float(product['product_profit']) / 100
+                    break
+
+        final_result = {}
+        for shift_id, sales in result.items():
+            final_result[shift_id] = {
+                'regular': list(sales['regular'].values()),
+                'delivery': list(sales['delivery'].values())
+            }
+
+        return final_result

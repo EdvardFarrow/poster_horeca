@@ -1,12 +1,18 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import SalaryRuleViewSet, SalaryRecordViewSet, RecalculateSalaryView
+from .views import PosterEmployeesViewSet, SalaryRuleViewSet, SalaryRecordViewSet
 
-router = DefaultRouter()
-router.register(r'rules', SalaryRuleViewSet, basename='salary-rule')
-router.register(r'records', SalaryRecordViewSet, basename='salary-record')
+rules_router = DefaultRouter()
+rules_router.register(r'rules', SalaryRuleViewSet, basename='salary-rule')
+
+records_router = DefaultRouter()
+records_router.register(r'records', SalaryRecordViewSet, basename='salary-record')
+
+employees_router = DefaultRouter()
+employees_router.register(r'employees', PosterEmployeesViewSet, basename='poster-employee')
 
 urlpatterns = [
-    path('', include(router.urls)),
-    path('recalculate/<int:shift_id>/', RecalculateSalaryView.as_view(), name='salary-recalculate'),
+    path('', include(rules_router.urls)),
+    path('', include(records_router.urls)),
+    path('', include(employees_router.urls)),
 ]

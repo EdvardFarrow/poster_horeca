@@ -21,10 +21,11 @@ class SalesSerializer(serializers.Serializer):
 class ProductSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
     product_name = serializers.CharField()
-    sum = serializers.DecimalField(max_digits=12, decimal_places=2, source="payed_sum")
-    count = serializers.IntegerField()
+    payed_sum = serializers.DecimalField(max_digits=12, decimal_places=2)
+    count = serializers.DecimalField(max_digits=12, decimal_places=2)
     price = serializers.DecimalField(max_digits=12, decimal_places=2, source="product_sum")
     profit = serializers.DecimalField(max_digits=12, decimal_places=2)
+    workshop = serializers.IntegerField()
     
 class ShiftSalesSerializer(serializers.Serializer):
     shift_id = serializers.IntegerField()

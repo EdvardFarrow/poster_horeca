@@ -101,6 +101,8 @@ class ShiftSalesView(viewsets.ViewSet):
                 'shift_id': shift_id,
                 'regular': sales.get('regular', []),
                 'delivery': sales.get('delivery', []),
+                'difference': sales.get('difference', 0),
+
             })
 
         serializer = ShiftSalesSerializer(serialized_data, many=True)

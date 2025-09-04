@@ -26,11 +26,13 @@ class ProductSerializer(serializers.Serializer):
     price = serializers.DecimalField(max_digits=12, decimal_places=2, source="product_sum")
     profit = serializers.DecimalField(max_digits=12, decimal_places=2)
     workshop = serializers.IntegerField()
-    
+
+
 class ShiftSalesSerializer(serializers.Serializer):
     shift_id = serializers.IntegerField()
     regular = ProductSerializer(many=True)
-    delivery = ProductSerializer(many=True)    
+    delivery = ProductSerializer(many=True)  
+    difference = serializers.DecimalField(max_digits=12, decimal_places=2)
 
 
 class CategorySerializer(serializers.Serializer):

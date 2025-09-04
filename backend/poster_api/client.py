@@ -40,7 +40,6 @@ class PosterAPIClient:
                 response = requests.post(url, params=params)
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
-            logger.info(f"Request to {endpoint} with params: {params}")
 
 
             response.raise_for_status()
@@ -70,7 +69,6 @@ class PosterAPIClient:
         if spot_id:
             params["spot_id"] = spot_id
 
-        logger.info(f"Waiters request params: {params}")
         data = self.make_request("GET", "dash.getAnalytics", params=params).get("response", [])
 
         normalized = []
@@ -103,7 +101,6 @@ class PosterAPIClient:
         if spot_id:
             params["spot_id"] = spot_id
 
-        logger.info(f"Clients request params: {params}")
         data = self.make_request("GET", "dash.getAnalytics", params=params).get("response", [])
 
         normalized = []
@@ -189,8 +186,6 @@ class PosterAPIClient:
         if spot_id:
             params["spot_id"] = int(spot_id)
 
-        logger.info(f"CashShifts request params: {params}")
-        print(f"CashShifts request params: {params}")
         response = self.make_request("GET", "finance.getCashShifts", params=params).get("response", [])
 
         if not response:
@@ -258,7 +253,6 @@ class PosterAPIClient:
             params["id"] = spot_id
 
         data = self.make_request("GET", "dash.getTransactions", params=params).get("response", [])
-        # Приведение времени к миллисекундам или float не требуется, API возвращает миллисекунды
         return data
 
 
@@ -275,45 +269,33 @@ class PosterAPIClient:
 
 
     def get_sales_by_shift_with_delivery(self, date: str, spot_id: int = None) -> dict:
-        logger.info(f"Start get_sales_by_shift_with_delivery for date={date}, spot_id={spot_id}")
 
-        # Делаем диапазон: date_from = date, date_to = следующий день до 06:00
         date_from_dt = datetime.strptime(date, "%Y-%m-%d")
         date_to_dt = date_from_dt + timedelta(days=1)
         date_to_dt_limit = date_to_dt.replace(hour=6, minute=0, second=0)
-        logger.debug(f"Calculated date_to_dt_limit={date_to_dt_limit}")
 
-        # Получаем смены за дату
         shifts_data = self.get_cash_shifts(date_from=date, date_to=date, spot_id=spot_id)
-        logger.info(f"Received {len(shifts_data)} shifts")
         if not shifts_data:
             logger.warning("No shifts found")
             return {}
 
-        
-        
         shifts = []
         for s in shifts_data:
             start_dt = datetime.strptime(s['date_start'], "%Y-%m-%d %H:%M:%S")
-
             if s['date_end'] == '0000-00-00 00:00:00':
                 end_dt = datetime.now()
             else:
                 end_dt = datetime.strptime(s['date_end'], "%Y-%m-%d %H:%M:%S")
-
             if end_dt > date_to_dt_limit:
                 end_dt = date_to_dt_limit
-
             shifts.append({
                 'id': s['poster_shift_id'],
                 'start_dt': start_dt,
-                'end_dt': end_dt
+                'end_dt': end_dt,
+                'total_payments': round((s.get("amount_sell_cash", 0) or 0) + (s.get("amount_sell_card", 0) or 0), 2)
             })
-        logger.debug(f"Processed shifts: {shifts}")
 
-        # Берём все транзакции за расширенный диапазон
         date_to_str = (date_from_dt + timedelta(days=1)).strftime("%Y-%m-%d")
-        logger.info(f"Fetching transactions from {date} to {date_to_str}")
         transactions_data = self.get_transactions(
             date_from=date,
             date_to=date_to_str,
@@ -321,31 +303,25 @@ class PosterAPIClient:
             include_products=True,
             include_delivery=True
         )
-        logger.info(f"Received {len(transactions_data)} transactions")
         if not transactions_data:
             logger.warning("No transactions found")
             return {}
 
         transaction_ids = [t['transaction_id'] for t in transactions_data]
-        logger.debug(f"Transaction IDs: {transaction_ids}")
 
         products_data = self.get_transactions_products(transaction_ids)
-        logger.info(f"Received {len(products_data)} products")
         if not products_data:
             logger.warning("No products found")
 
-        # Подготовка структуры результата
         result = {
             shift['id']: {
-                'regular': defaultdict(lambda: {'product_id': None, 'product_name': None, 'count': 0, 'payed_sum': 0, 'profit': 0}),
-                'delivery': defaultdict(lambda: {'product_id': None, 'product_name': None, 'count': 0, 'payed_sum': 0, 'profit': 0})
+                'regular': defaultdict(lambda: {'product_id': None, 'product_name': None, 'count': 0, 'payed_sum': 0.0, 'profit': 0.0}),
+                'delivery': defaultdict(lambda: {'product_id': None, 'product_name': None, 'count': 0, 'payed_sum': 0.0, 'profit': 0.0}),
+                'difference': 0.0  
             }
             for shift in shifts
         }
 
-        
-        
-        # Распределяем продукты по сменам
         for product in products_data:
             try:
                 product_time = datetime.fromtimestamp(int(product['time']) / 1000)
@@ -362,23 +338,51 @@ class PosterAPIClient:
                             res['workshop'] = product.get('workshop')
 
                         res['count'] += float(product['num'])
-                        res['payed_sum'] += float(product.get('payed_sum', 0))
+                        res['payed_sum'] = round(res['payed_sum'] + float(product.get('payed_sum', 0)), 2)
                         res['product_sum'] = float(product.get('product_sum', 0))
-                        res['profit'] += float(product.get('product_profit', 0)) / 100
+                        res['profit'] += round(float(product.get('product_profit', 0)) / 100, 2)
                         assigned = True
                         break
-                if not assigned:
-                    logger.warning(f"Product {product['product_name']} with time {product_time} not assigned to any shift")
+
+                # Костыль: учитываем продукты до начала первой смены
+                if not assigned and shifts:
+                    first_shift = shifts[0]
+                    first_shift_start = first_shift['start_dt']
+
+                    early_morning_start = first_shift_start.replace(hour=9, minute=0, second=0)
+                    if early_morning_start <= product_time < first_shift_start:
+                        res = result[first_shift['id']][category][product['product_id']]
+                        if res['product_id'] is None:
+                            res['product_id'] = product['product_id']
+                            res['product_name'] = product['product_name']
+                            res['workshop'] = product.get('workshop')
+
+                        res['count'] += float(product['num'])
+                        res['payed_sum'] = round(res['payed_sum'] + float(product.get('payed_sum', 0)), 2)
+                        res['product_sum'] = float(product.get('product_sum', 0))
+                        res['profit'] += round(float(product.get('product_profit', 0)) / 100, 2)
+                        assigned = True
+
+
             except Exception as e:
                 logger.error(f"Error processing product {product}: {e}")
 
-        # Формируем финальный результат
+        for shift in shifts:
+            shift_id = shift['id']
+            regular_sum = sum(p['payed_sum'] for p in result[shift_id]['regular'].values())
+            delivery_sum = sum(p['payed_sum'] for p in result[shift_id]['delivery'].values())
+            total_sales = round(regular_sum + delivery_sum, 2)
+            difference = round(shift['total_payments'] - total_sales, 2)
+            result[shift_id]['difference'] = round(shift['total_payments'] - total_sales, 2)
+            
+            
+
         final_result = {}
         for shift_id, sales in result.items():
             final_result[shift_id] = {
                 'regular': list(sales['regular'].values()),
-                'delivery': list(sales['delivery'].values())
+                'delivery': list(sales['delivery'].values()),
+                'difference': sales['difference']  
             }
 
-        logger.info(f"Completed get_sales_by_shift_with_delivery with {len(final_result)} shifts")
         return final_result

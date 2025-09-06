@@ -172,3 +172,26 @@ class CashShiftSerializer(serializers.Serializer):
     user_id_start = serializers.CharField(allow_null=True, allow_blank=True)
     user_id_end = serializers.CharField(allow_null=True, allow_blank=True)
     comment = serializers.CharField(allow_null=True, allow_blank=True)
+
+
+
+
+class TransactionHistorySerializer(serializers.Serializer):
+    transaction_id = serializers.CharField()
+    type_history = serializers.CharField()
+    time = serializers.CharField()
+    value = serializers.CharField(allow_null=True)
+    value2 = serializers.CharField(allow_null=True)
+    value3 = serializers.CharField(allow_null=True)
+    value_text = serializers.CharField(allow_null=True)
+    spot_tablet_id = serializers.CharField(allow_null=True)
+
+
+
+class PaymentIDsSerialzer(serializers.Serializer):
+    payment_method_id = serializers.IntegerField()
+    title = serializers.CharField()
+    
+    
+    
+    

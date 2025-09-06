@@ -1,10 +1,14 @@
+import asyncio
 from datetime import datetime as dt
+import json
+from typing import Optional
 from rest_framework import viewsets, status
-from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.decorators import action
+from asgiref.sync import sync_to_async, async_to_sync
 
 from .client import PosterAPIClient
-from .serializers import CashShiftSerializer, ShiftSalesSerializer, StatisticsResponseSerializer
+from .serializers import CashShiftSerializer, PaymentIDsSerialzer, ShiftSalesSerializer, StatisticsResponseSerializer, TransactionHistorySerializer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -107,3 +111,49 @@ class ShiftSalesView(viewsets.ViewSet):
 
         serializer = ShiftSalesSerializer(serialized_data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+
+
+
+class TransactionsHistoryViewSet(viewsets.ViewSet):
+
+    def list(self, request):
+        return async_to_sync(self._async_list)(request)
+
+    async def _async_list(self, request):
+        date_from = request.query_params.get("date_from")
+        date_to = request.query_params.get("date_to")
+        spot_id = request.query_params.get("spot_id")
+
+        if not date_from or not date_to:
+            return Response({"error": "date_from and date_to are required"}, status=400)
+
+        spot_id_int = int(spot_id) if spot_id else None
+        client = PosterAPIClient()
+
+        try:
+            transactions = await client.get_full_transactions_for_day(
+                date_from=date_from,
+                date_to=date_to,
+                spot_id=spot_id_int
+            )
+            serializer = TransactionHistorySerializer(transactions, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"[TRANSACTIONS_HISTORY] Failed: {e}", exc_info=True)
+            return Response({"error": "Failed to fetch transactions"}, status=500)
+
+
+
+
+
+class PaymentMethodsView(viewsets.ViewSet):
+    def list(self, request, *args, **kwargs):
+        client = PosterAPIClient()
+        payments_data = client.get_payments_id()
+        serializer = PaymentIDsSerialzer(payments_data, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    

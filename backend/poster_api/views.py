@@ -106,6 +106,8 @@ class ShiftSalesView(viewsets.ViewSet):
                 'regular': sales.get('regular', []),
                 'delivery': sales.get('delivery', []),
                 'difference': sales.get('difference', 0),
+                'tips': sales.get('tips', 0.0),
+                'tips_by_service': sales.get('tips_by_service', {})
 
             })
 

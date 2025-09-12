@@ -278,6 +278,9 @@ class PosterAPIClient:
                 actions = history.get("response", [])
 
                 payment_method_id = None
+                tip_sum = 0.0 
+                
+                
                 for action in actions:
                     if action.get("type_history") == "close" and action.get("value_text"):
                         try:
@@ -285,11 +288,22 @@ class PosterAPIClient:
                             payment_method_id = value_text.get("payment_method_id")
                             if payment_method_id is not None:
                                 payment_method_id = int(payment_method_id)
+                                
+                            ts = value_text.get("tip_sum")
+                            if ts is None:
+                                ts = value_text.get("tip")
+                            if ts is not None:
+                                try:
+                                    tip_sum += float(ts)
+                                except Exception:
+                                    logger.debug(f"Can't parse tip_sum '{ts}' for tx {tx_id}")    
+                            
                             
                         except Exception as e:
                             logger.warning(f"Failed to parse value_text for {tx_id}: {e}")
 
-                return tx_id, actions, payment_method_id
+                return tx_id, actions, payment_method_id, tip_sum
+
 
             except Exception as e:
                 logger.warning(f"Failed to fetch history for {tx_id}: {e}")
@@ -336,8 +350,22 @@ class PosterAPIClient:
 
         transaction_ids = [t['transaction_id'] for t in transactions_data]
         histories = asyncio.run(self.fetch_all_histories(transaction_ids))
-        payment_map = {int(tx_id): int(payment_method_id) if payment_method_id is not None else None for tx_id, _, payment_method_id in histories}
-        products_data = self.get_transactions_products(transaction_ids)
+        payment_map = {}
+        tips_map = {}
+        for entry in histories:
+            try:
+                tx_id, _, payment_method_id, tip_sum = entry
+            except ValueError:
+                tx_id, _, payment_method_id = entry
+                tip_sum = 0.0
+            try:
+                tx_int = int(tx_id)
+            except Exception:
+                continue
+            payment_map[tx_int] = int(payment_method_id) if payment_method_id is not None else None
+            tips_map[tx_int] = float(tip_sum or 0.0)
+
+        products_data = self.get_transactions_products(transaction_ids)        
 
         regular_payment_id = (0, 1, 2, 3, 4, 5)
         service_map = {
@@ -353,11 +381,63 @@ class PosterAPIClient:
         result = {
             shift['id']: {
                 'regular': defaultdict(lambda: {'product_id': None, 'product_name': None, 'count': 0, 'product_sum': 0.0, 'payed_sum': 0.0, 'profit': 0.0, 'workshop': None}),
-                'delivery': defaultdict(lambda: {'product_id': None, 'product_name': None, 'count': 0, 'product_sum': 0.0, 'payed_sum': 0.0, 'profit': 0.0, 'workshop': None, 'delivery_service': "Другое"}),
-                'difference': 0.0
+                'delivery': defaultdict(lambda: {'product_id': None, 'product_name': None, 'count': 0, 'product_sum': 0.0, 'payed_sum': 0.0, 'profit': 0.0, 'workshop': None, 'delivery_service': "Другое", 'tips': 0.0}),
+                'difference': 0.0,
+                'tips': 0.0
             } for shift in shifts
         }
 
+        # Сопоставление времени транзакций
+        tx_time_map = {}
+        for prod in products_data:
+            try:
+                tx_id = int(prod.get('transaction_id'))
+                if tx_id not in tx_time_map:
+                    tx_time_map[tx_id] = datetime.fromtimestamp(int(prod['time']) / 1000)
+            except Exception:
+                continue
+
+        # Распределяем tips по сменам и сервисам
+        tips_by_shift_service = {shift['id']: defaultdict(float) for shift in shifts}
+        for tx_id, tip in tips_map.items():
+            if not tip:
+                continue
+            tx_time = tx_time_map.get(tx_id)
+            if not tx_time:
+                tx_obj = next((t for t in transactions_data if str(t.get('transaction_id')) == str(tx_id)), None)
+                if tx_obj:
+                    possible = tx_obj.get('time') or tx_obj.get('date') or tx_obj.get('created_at')
+                    if possible:
+                        try:
+                            tx_time = datetime.fromtimestamp(int(possible) / 1000)
+                        except Exception:
+                            tx_time = None
+            if not tx_time:
+                continue
+
+            found_shift_id = None
+            for shift in shifts:
+                if shift['start_dt'] <= tx_time <= shift['end_dt']:
+                    found_shift_id = shift['id']
+                    break
+            if not found_shift_id and shifts:
+                first_shift = shifts[0]
+                early_morning_start = first_shift['start_dt'].replace(hour=9, minute=0, second=0)
+                if early_morning_start <= tx_time < first_shift['start_dt']:
+                    found_shift_id = first_shift['id']
+
+            if not found_shift_id:
+                continue
+
+            payment_id = payment_map.get(tx_id)
+            try:
+                payment_id_int = int(payment_id) if payment_id is not None else None
+            except Exception:
+                payment_id_int = None
+            service_name = service_map.get(payment_id_int, "Другое")
+            tips_by_shift_service[found_shift_id][service_name] += tip
+
+        # Распределяем продукты по сменам
         for product in products_data:
             try:
                 product_time = datetime.fromtimestamp(int(product['time']) / 1000)
@@ -375,7 +455,6 @@ class PosterAPIClient:
                 for shift in shifts:
                     if shift['start_dt'] <= product_time <= shift['end_dt']:
                         key = f"{product['product_id']}_{product['delivery_service']}" if category == 'delivery' else product['product_id']
-
                         res = result[shift['id']][category][key]
                         if res['product_id'] is None:
                             res['product_id'] = product['product_id']
@@ -413,21 +492,67 @@ class PosterAPIClient:
             except Exception as e:
                 logger.error(f"Error processing product {product}: {e}")
 
+        # Считаем разницу и распределяем tips на продукты
         for shift in shifts:
-            shift_id = shift['id']
-            regular_sum = sum(p['payed_sum'] for p in result[shift_id]['regular'].values())
-            delivery_sum = sum(p['payed_sum'] for p in result[shift_id]['delivery'].values())
+            sid = shift['id']
+            regular_sum = sum(p['payed_sum'] for p in result[sid]['regular'].values())
+            delivery_sum = sum(p['payed_sum'] for p in result[sid]['delivery'].values())
             total_sales = round(regular_sum + delivery_sum, 2)
-            result[shift_id]['difference'] = round(shift['total_payments'] - total_sales, 2)
+            result[sid]['difference'] = round(shift['total_payments'] - total_sales, 2)
 
-        # Преобразуем в финальный словарь
+            # Присвоение tips
+            service_tips = tips_by_shift_service.get(sid, {})
+            for entry in result[sid]['delivery'].values():
+                entry.setdefault('tips', 0.0)
+            for service, tip_sum in service_tips.items():
+                assigned = False
+                for entry in result[sid]['delivery'].values():
+                    if entry.get('delivery_service') == service:
+                        entry['tips'] += round(float(tip_sum), 2)
+                        assigned = True
+                        break
+                if not assigned:
+                    key = f"service_total_{service}"
+                    result[sid]['delivery'][key] = {
+                        'product_id': None,
+                        'product_name': "",
+                        'count': 0,
+                        'product_sum': 0.0,
+                        'payed_sum': 0.0,
+                        'profit': 0.0,
+                        'workshop': None,
+                        'delivery_service': service,
+                        'tips': round(float(tip_sum), 2),
+                    }
+
+            result[sid]['tips'] = round(sum(entry.get('tips', 0.0) for entry in result[sid]['delivery'].values()), 2)
+
+        
+        
+        # Формируем финальный результат
         final_result = {}
         for shift_id, sales in result.items():
+            
+            tips_by_service = {}
+            
+            for entry in sales['delivery'].values():
+                service = entry.get('delivery_service', 'Другое')
+                tips_by_service[service] = tips_by_service.get(service, 0.0) + entry.get('tips', 0.0)
+            
             final_result[shift_id] = {
                 'regular': sorted(list(sales['regular'].values()), key=lambda x: x['product_name'] or ""),
                 'delivery': sorted(list(sales['delivery'].values()), key=lambda x: x['product_name'] or ""),
-                'difference': sales['difference']
+                'difference': sales['difference'],
+                'tips': sales['tips'],
+                'tips_by_service': tips_by_service
             }
+            logger.debug(
+                "SHIFT %s - DELIVERY: %s, TIPS: %s",
+                shift_id,
+                json.dumps(final_result[shift_id]['delivery'], ensure_ascii=False)[:2000],
+                final_result[shift_id]['tips'],
+                final_result[shift_id]['tips_by_service']
+            )
 
         return final_result
 

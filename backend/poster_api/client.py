@@ -146,12 +146,32 @@ class PosterAPIClient:
 
         for item in data:
             normalized.append({
+                "product_id": item.get("product_id"),
                 "name": item.get("product_name"),
-                "count": float(item.get("count", 0)),
+                "category_id": item.get("category_id"),
+                "category_name": item.get("category_name"),
                 "price": int(item.get("price", 0)),
+                "count": float(item.get("count", 0)),
                 "product_profit": round(int(item.get("product_profit", 0)) / 100, 2)
             })
         return normalized
+    
+    #--------------Category------------
+    def get_category(self, spot_id: int = None) -> list[dict]:
+        params = {}
+        if spot_id:
+            params["spot_id"] = spot_id
+
+        data = self.make_request("GET", "menu.getCategories", params=params).get("response", [])
+
+        return [
+            {
+                "category_id": el.get("category_id"),
+                "name": el.get("category_name"),
+            }
+            for el in data
+        ]
+
 
     # ------------------ Categories ------------------
     def get_categories_sales(self, date_from: str = None, date_to: str = None, spot_id: int = None) -> List[dict]:
@@ -172,6 +192,7 @@ class PosterAPIClient:
 
         for item in data:
             normalized.append({
+                "category_id": item.get("category_id"),
                 "name": item.get("category_name"),
                 "count": float(item.get("count", 0)),
                 "profit": round(int(item.get("profit", 0)) / 100, 2),
@@ -593,3 +614,20 @@ class PosterAPIClient:
 
         return all_close_history
 
+
+
+def get_payments_id(self) -> list[dict]:
+        data = self.make_request("GET", "menu.getWorkshops").get("response", [])
+
+        return [
+            {
+                "workshop_id": el.get("workshop_id"),
+                "workshop_name": el.get("workshop_name"),
+                "delete": el.get("delete")
+            }
+            for el in data
+        ]
+        
+        
+        
+        

@@ -1,58 +1,34 @@
 from django.db import models
 from django.conf import settings
-from poster_api.models import Category, Product
-from shift.models import Shift
+from poster_api.models import CashShiftReport
+from users.models import Employee, Role
+
 
 
 class SalaryRule(models.Model):
-
-    employee = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="salary_rules"
-    )
-    # Тип начисления
-    FIXED = "fixed"
-    PERCENT_SHIFT = "percent_shift"
-    PERCENT_CATEGORY = "percent_category"
-    PERCENT_PRODUCT = "percent_product"
-
-    RULE_TYPE_CHOICES = [
-        (FIXED, "Фиксированная сумма за смену"),
-        (PERCENT_SHIFT, "Процент от всей выручки смены"),
-        (PERCENT_CATEGORY, "Процент от категории"),
-        (PERCENT_PRODUCT, "Процент от позиции"),
-    ]
-
-    rule_type = models.CharField(max_length=20, choices=RULE_TYPE_CHOICES)
-
-    # Общие параметры
-    value = models.DecimalField(max_digits=10, decimal_places=2,)
-
-    # Для процента от категории
-    category = models.ForeignKey(Category, on_delete=models.CASCADE, null=True, blank=True,)
-
-    # Для процента от конкретной позиции
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True,)
+    role = models.ForeignKey(Role, on_delete=models.CASCADE,default=None)
+    category_name = models.CharField(max_length=255, blank=True, null=True)  
+    percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)  # % от выручки
+    fixed_per_shift = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # фикс за смену
+    fixed_per_item = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # фикс за товар (например, кальян)
+    product_name = models.CharField(max_length=255, blank=True, null=True)  # например, "Кальян на грейпфруте"
 
     def __str__(self):
-        return f"{self.employee} - {self.get_rule_type_display()} ({self.value})"
+        return f"Правило для {self.role}"
+
 
 
 class SalaryRecord(models.Model):
-    employee = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="salary_records"
-    )
-    shift = models.ForeignKey(
-        Shift,
-        on_delete=models.CASCADE,
-        related_name="salary_records"
-    )
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    shift = models.ForeignKey(CashShiftReport, on_delete=models.CASCADE)
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.employee} | {self.shift} | {self.amount}₽"
+    class Meta:
+        unique_together = ('shift', 'employee')
+        
+        
+        
+class MonthlySalarySummary(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    month = models.DateField()  # 2025-09-01
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)        

@@ -23,3 +23,19 @@ class User(AbstractUser):
     
     def __str__(self):
         return self.username    
+    
+    
+    
+    
+class Role(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+
+class Employee(models.Model):
+    name = models.CharField(max_length=255)
+    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.role})"
+    

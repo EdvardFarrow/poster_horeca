@@ -16,17 +16,20 @@ class Category(models.Model):
     
 
 class CategoriesSales(models.Model):
-    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='sales')
+    category_id = models.IntegerField(unique=True, default=1)
+    category_name = models.CharField(max_length=225, default="")
     profit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     count = models.IntegerField(default=0)    
 
                 
 class Product(models.Model):
     product_id = models.IntegerField(unique=True)
-    name = models.CharField(max_length=255)
-    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="products")
-    category_name = models.CharField(max_length=255)
-    price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    product_name = models.CharField(max_length=255)
+    category = models.ForeignKey(Category, on_delete=models.SET_DEFAULT, default=1)    
+    cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    fiscal = models.IntegerField(default=1)
+    workshop = models.IntegerField(default=0)
+    
 
 
 
@@ -42,59 +45,76 @@ class Workshop(models.Model):
     delete = models.BooleanField(default=False)
 
 
-class Discount(models.Model):
-    discount_id = models.IntegerField(unique=True)
-    name = models.CharField(max_length=255)
-
-
 class Payments_ID(models.Model):
     payment_method_id = models.IntegerField(unique=True)
-    title = models.CharField()
-    
-    
-class Transactions(models.Model):
-    transaction_id = models.IntegerField(unique=True)
-    date_start = models.DateTimeField()
-    date_close = models.DateTimeField()
-    status = models.IntegerField()
-    pay_type = models.IntegerField()
-    payed_sum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    sum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    spot_id = models.IntegerField()
-    transaction_comment = models.CharField(max_length=225, blank=True, null=True)
-    reason = models.IntegerField()
-    total_profit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    client_firstname = models.CharField(max_length=225)
-    client_lastname = models.CharField(max_length=225)
-    client_phone = models.CharField(max_length=20, blank=True, null=True)
-    client_id = models.IntegerField(unique=True)
-    service_mode = models.IntegerField()
-    processing_status = models.IntegerField()
+    title = models.CharField(max_length=225)
     
 
-
-class Client(models.Model):
-    client_id = models.IntegerField(unique=True)
+class Clients(models.Model):
+    client_id = models.IntegerField(default=1)
     firstname = models.CharField(default="")
     lastname = models.CharField(default="")
-    name = models.CharField(max_length=255, null=True, blank=True)
-    phone = models.CharField(max_length=50, null=True, blank=True)
+    name = models.CharField(max_length=255,  blank=True, default="")
+    phone = models.CharField(max_length=50,  blank=True, default="")
     email = models.EmailField(null=True, blank=True)
     revenue = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     profit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    transactions = models.IntegerField(default=None)
+    transactions = models.IntegerField(default=0)
+    avg_check = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    
+    
+class Transactions(models.Model):
+    transaction_id = models.IntegerField(null=True, blank=True)
+    date_start = models.DateTimeField()
+    date_close = models.DateTimeField()
+    status = models.IntegerField(default=0)
+    pay_type = models.IntegerField(default=0)
+    payed_sum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    sum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    spot_id = models.IntegerField(default=1)
+    transaction_comment = models.CharField(max_length=225, blank=True, null=True)
+    reason = models.CharField(default="")
+    total_profit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    client_firstname = models.CharField(max_length=225, blank=True)
+    client_lastname = models.CharField(max_length=225, blank=True)
+    client_phone = models.CharField(max_length=20, blank=True, null=True)
+    client_id = models.CharField(default="", null=True, blank=True)
+    service_mode = models.IntegerField(default=0)
+    processing_status = models.IntegerField(default=0)
+    
+    
+class TransactionsProducts(models.Model):
+    transaction = models.ForeignKey(Transactions, on_delete=models.CASCADE, related_name="products")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="transaction_entries")
+    num = models.IntegerField(default=0)
+    workshop = models.IntegerField(default=0)
+    payed_sum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    client = models.ForeignKey(Clients, on_delete=models.CASCADE, related_name="transaction_entries", null=True, blank=True)
+    product_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    product_profit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    
+    
+class TransactionHistory(models.Model):
+    transaction = models.ForeignKey(Transactions, on_delete=models.CASCADE, related_name="history")
+    type_history = models.CharField(max_length=50)
+    time = models.DateTimeField()
+    value = models.CharField(default="")
+    value2 = models.CharField(default="")
+    value3 = models.CharField(default="")
+    value_text = models.JSONField(null=True, blank=True)
+    spot_tablet_id = models.IntegerField(null=True, blank=True)
+
+
 
 class AnalyticsRecord(models.Model):
     
     TYPE_CHOICES = [
-        ("finance", "Finance"),
         ("sales", "Sales"),
         ("products", "Products"),
         ("categories", "Categories"),
         ("clients", "Clients"),
         ("employees", "Employees"),
-        ("discounts", "Discounts"),
-        ("departments", "Departments"),
+        ("workshop", "Workshop"),
     ]
 
     type = models.CharField(max_length=50, choices=TYPE_CHOICES)
@@ -130,7 +150,7 @@ class CashShiftReport(models.Model):
 
 
 class ShiftSale(models.Model):
-    poster_shift_id = models.IntegerField()
+    shift_id = models.IntegerField()
     date = models.DateField()
     
     total_revenue = models.DecimalField(max_digits=12, decimal_places=2, default=0.0)

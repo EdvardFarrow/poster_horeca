@@ -58,36 +58,6 @@ class PosterAPIClient:
             return {"error": str(e)}
         
 
-    # ------------------ Waiters ------------------
-    def get_waiters_sales(self, date_from: str = None, date_to: str = None, spot_id: int = None) -> list[dict]:
-        params = {
-            "type": "waiters",
-            "interpolate": "day",
-            "business_day": "false",
-        }
-        if date_from:
-            params["dateFrom"] = self._format_date(date_from)
-        if date_to:
-            params["dateTo"] = self._format_date(date_to)
-        if spot_id:
-            params["spot_id"] = spot_id
-
-        data = self.make_request("GET", "dash.getAnalytics", params=params).get("response", [])
-
-        normalized = []
-        for item in data:
-            revenue = int(item.get("revenue", 0)) / 100
-            transactions = int(item.get("clients", 0))
-            avg_check = revenue / transactions if transactions else 0
-
-            normalized.append({
-                "name": item.get("name"),
-                "revenue": round(revenue, 2),
-                "profit": round(int(item.get("profit", 0)) / 100, 2),
-                "transactions": transactions,
-                "avg_check": round(avg_check, 2)
-            })
-        return normalized
 
 
     # ------------------ Clients ------------------
@@ -113,7 +83,7 @@ class PosterAPIClient:
             avg_check = revenue / transactions if transactions else 0
 
             normalized.append({
-                "id": item.get("id"),
+                "client_id": item.get("client_id"),
                 "firstname": item.get("firstname", ""),
                 "lastname": item.get("lastname", ""),
                 "phone": item.get("phone", ""),
@@ -127,7 +97,30 @@ class PosterAPIClient:
         return normalized
 
 
+
     # ------------------ Products ------------------
+    def get_products(self, spot_id: int = None) -> list[dict]:
+        params = {}
+        if spot_id:
+            params["spot_id"] = spot_id
+
+        data = self.make_request("GET", "menu.getProducts", params=params).get("response", [])
+        normalized = []
+        for item in data:
+            normalized.append({
+                "product_id": item.get("product_id"),
+                "product_name": item.get("product_name"),
+                "category_id": item.get("menu_category_id"),
+                "category_name": item.get("category_name"),
+                "cost": float(item.get("cost", 0)),
+                "fiscal": bool(item.get("fiscal", True)),
+                "workshop": int(item.get("workshop", 0))
+            })
+        return normalized
+
+
+
+    # ------------------ Products Sales------------------
     def get_products_sales(self, date_from: str = None, date_to: str = None, spot_id: int = None) -> List[dict]:
         params = {
             "type": "products",
@@ -201,7 +194,24 @@ class PosterAPIClient:
 
 
     # ------------------ Reports ------------------
-    def get_cash_shifts(self, date_from: str = None, date_to: str = None, spot_id: int = None) -> List[dict]:
+    def _normalize_shift(self, shift: dict) -> dict:
+        return {
+            "poster_shift_id": shift.get("cash_shift_id"),
+            "date_start": shift.get("date_start"),
+            "date_end": shift.get("date_end"),
+            "amount_start": int(shift.get("amount_start", 0)) / 100,
+            "amount_end": int(shift.get("amount_end", 0)) / 100,
+            "amount_debit": int(shift.get("amount_debit", 0)) / 100,
+            "amount_sell_cash": int(shift.get("amount_sell_cash", 0)) / 100,
+            "amount_sell_card": int(shift.get("amount_sell_card", 0)) / 100,
+            "amount_credit": int(shift.get("amount_credit", 0)) / 100,
+            "amount_collection": int(shift.get("amount_collection", 0)) / 100,
+            "user_id_start": shift.get("user_id_start"),
+            "user_id_end": shift.get("user_id_end"),
+            "comment": shift.get("comment"),
+        }
+
+    def get_cash_shifts(self, date_from: str = None, date_to: str = None, spot_id: int = None) -> list[dict]:
         params = {}
         if date_from:
             params["dateFrom"] = self._format_date(date_from)
@@ -211,49 +221,10 @@ class PosterAPIClient:
             params["spot_id"] = int(spot_id)
 
         response = self.make_request("GET", "finance.getCashShifts", params=params).get("response", [])
-
-        if not response:
-            return []
-
-        normalized = []
-        for shift in response:
-            normalized.append({
-                "poster_shift_id": shift.get("cash_shift_id"),
-                "date_start": shift.get("date_start"),
-                "date_end": shift.get("date_end"),
-                "amount_start": int(shift.get("amount_start", 0)) / 100,
-                "amount_end": int(shift.get("amount_end", 0)) / 100,
-                "amount_debit": int(shift.get("amount_debit", 0)) / 100,
-                "amount_sell_cash": int(shift.get("amount_sell_cash", 0)) / 100,
-                "amount_sell_card": int(shift.get("amount_sell_card", 0)) / 100,
-                "amount_credit": int(shift.get("amount_credit", 0)) / 100,
-                "amount_collection": int(shift.get("amount_collection", 0)) / 100,
-                "user_id_start": shift.get("user_id_start"),
-                "user_id_end": shift.get("user_id_end"),
-                "comment": shift.get("comment"),
-            })
-        return normalized   
+        return [self._normalize_shift(shift) for shift in response] if response else []
 
 
 
-
-
-    def get_employees(self) -> List[dict]:
-        data = self.make_request("GET", "access.getEmployees").get("response", [])
-        normalized = []
-        
-        for emp in data:
-            normalized.append({
-                "poster_id": emp.get("user_id"),
-                "name": emp.get("name"),
-                "role_id": emp.get("role_id"),
-                "role_name": emp.get("role_name"),
-                "phone": emp.get("phone"),
-                "access_mask": emp.get("access_mask"),
-                "user_type": emp.get("user_type"),
-                "last_in": emp.get("last_in"),
-            })
-        return normalized
     
     
     
@@ -265,25 +236,25 @@ class PosterAPIClient:
             include_products: bool = False,
             include_delivery: bool = False
         ) -> list[dict]:
-            params = {
-                "dateFrom": self._format_date(date_from),
-                "dateTo": self._format_date(date_to),
-                "status": 2,  # только закрытые
-                "include_products": str(include_products).lower(),
-                "include_delivery": str(include_delivery).lower(),
-                "type": "spots",
-            }
-            if spot_id:
-                params["id"] = spot_id
+        params = {
+            "dateFrom": self._format_date(date_from),
+            "dateTo": self._format_date(date_to),
+            "status": 2,  # только закрытые
+            "include_products": str(include_products).lower(),
+            "include_delivery": str(include_delivery).lower(),
+            "type": "spots",
+        }
+        if spot_id:
+            params["id"] = spot_id
 
-            data = self.make_request("GET", "dash.getTransactions", params=params).get("response", [])
-            return data
+        data = self.make_request("GET", "dash.getTransactions", params=params).get("response", [])
+        return data
 
-    def get_transactions_products(self, transaction_ids: list[int]) -> list[dict]:
-        if not transaction_ids:
-            return []
+    def get_transactions_products(self, transaction_ids: list[int] = None) -> list[dict]:
+        params = {}
+        if transaction_ids:
+            params["transactions_id"] = ",".join(map(str, transaction_ids))
 
-        params = {"transactions_id": ",".join(map(str, transaction_ids))}
         data = self.make_request("GET", "dash.getTransactionsProducts", params=params).get("response", [])
         return data
 
@@ -616,7 +587,7 @@ class PosterAPIClient:
 
 
 
-def get_payments_id(self) -> list[dict]:
+    def get_workshop(self) -> list[dict]:
         data = self.make_request("GET", "menu.getWorkshops").get("response", [])
 
         return [

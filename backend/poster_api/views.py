@@ -8,7 +8,7 @@ from rest_framework.decorators import action
 from asgiref.sync import sync_to_async, async_to_sync
 
 from .client import PosterAPIClient
-from .serializers import CashShiftSerializer, PaymentIDsSerialzer, ShiftSalesSerializer, StatisticsResponseSerializer, TransactionHistorySerializer
+from .serializers import CashShiftSerializer, ShiftSalesSerializer, TransactionHistorySerializer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -102,7 +102,7 @@ class ShiftSalesView(viewsets.ViewSet):
         serialized_data = []
         for shift_id, sales in data.items():
             serialized_data.append({
-                'shift_id': shift_id,
+                'poster_shift_id': shift_id,
                 'regular': sales.get('regular', []),
                 'delivery': sales.get('delivery', []),
                 'difference': sales.get('difference', 0),

@@ -1,56 +1,152 @@
+from decimal import Decimal
 from rest_framework import serializers
+from .models import (
+    CategoriesSales, 
+    ProductSales, 
+    Product, 
+    Category,
+    ShiftSale,
+    ShiftSaleItem,
+    TransactionHistory,
+    Transactions,
+    TransactionsProducts,
+    Clients
+)
 
 
+class CategoryModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = [
+            "category_id", 
+            "name"
+            ]
 
-class FinanceSerializer(serializers.Serializer):
-    sum = serializers.DecimalField(max_digits=12, decimal_places=2)
-    profit = serializers.DecimalField(max_digits=12, decimal_places=2)
-    orders_count = serializers.IntegerField()
+class ProductModelSerializer(serializers.ModelSerializer):
+    category_id = serializers.PrimaryKeyRelatedField(
+        source='category',  # связывает с полем categor
+        queryset=Category.objects.all()
+    )
+    class Meta:
+        model = Product
+        fields = [
+            "product_id", 
+            "product_name", 
+            "category_id", 
+            "cost", 
+            "fiscal", 
+            "workshop"
+            ]
+
+class ProductSalesModelSerializer(serializers.ModelSerializer):
+    product = ProductModelSerializer(read_only=True)
+
+    class Meta:
+        model = ProductSales
+        fields = [
+            "product", 
+            "product_profit", 
+            "count"
+            ]
+
+class CategoriesSalesModelSerializer(serializers.ModelSerializer):
+    category = CategoryModelSerializer(read_only=True)
+
+    class Meta:
+        model = CategoriesSales
+        fields = [
+            "category_id",
+            "category_name",
+            "profit", 
+            "count"
+            ]
 
 
-
-class SalesSerializer(serializers.Serializer):
+class ProductAPISerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
     product_name = serializers.CharField()
     category_id = serializers.IntegerField()
     category_name = serializers.CharField()
-    sum = serializers.DecimalField(max_digits=12, decimal_places=2)
-    count = serializers.IntegerField()
+    cost = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
+    fiscal = serializers.BooleanField(default=True)
+    workshop = serializers.IntegerField(default=0)
 
-
-class ProductSerializer(serializers.Serializer):
+class ProductSalesAPISerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
     product_name = serializers.CharField()
-    payed_sum = serializers.DecimalField(max_digits=12, decimal_places=2)
-    count = serializers.DecimalField(max_digits=12, decimal_places=2)
-    price = serializers.DecimalField(max_digits=12, decimal_places=2, source="product_sum")
-    profit = serializers.DecimalField(max_digits=12, decimal_places=2)
-    workshop = serializers.IntegerField()
-    delivery_service = serializers.CharField(required=False, allow_null=True)
-
-
-class ShiftSalesSerializer(serializers.Serializer):
-    shift_id = serializers.IntegerField()
-    regular = ProductSerializer(many=True)
-    delivery = ProductSerializer(many=True)  
-    difference = serializers.DecimalField(max_digits=12, decimal_places=2)
-    tips = serializers.FloatField()
-    tips_by_service = serializers.DictField(child=serializers.FloatField())
-
-
-class CategorySerializer(serializers.Serializer):
     category_id = serializers.IntegerField()
     category_name = serializers.CharField()
-    sum = serializers.DecimalField(max_digits=12, decimal_places=2)
-    count = serializers.IntegerField()
+    product_price = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
+    count = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
+    product_profit = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
 
-
-class ClientSerializer(serializers.Serializer):
+class CategoryAPISerializer(serializers.Serializer):
+    category_id = serializers.IntegerField()
     name = serializers.CharField()
-    email = serializers.CharField(required=False, allow_null=True)
-    visits = serializers.IntegerField(source="transactions")
-    sum = serializers.DecimalField(max_digits=12, decimal_places=2, source="revenue")
-    avg_check = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+class CategoriesSalesAPISerializer(serializers.Serializer):
+    category_id = serializers.IntegerField()
+    name = serializers.CharField()
+    count = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
+    profit = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+
+class WorkshopSerializer(serializers.Serializer):
+    workshop_id = serializers.IntegerField()
+    workshop_name = serializers.CharField(max_length=255)
+    delete = serializers.BooleanField(default=False)
+
+
+class PaymentMethodSerializer(serializers.Serializer):
+    payment_method_id = serializers.IntegerField()
+    title = serializers.CharField(max_length=255)
+
+
+class TransactionsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Transactions
+        fields = "__all__"
+        
+class TransactionsProductsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TransactionsProducts
+        field = "__all__"        
+
+class TransactionHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TransactionHistory
+        fields = "__all__"
+
+
+class ClientSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Clients
+        fields = [
+            "client_id",
+            "firstname",
+            "lastname",
+            "name",
+            "phone",
+            "email",
+            "revenue",
+            "profit",
+            "transactions",
+        ]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class EmployeeSerializer(serializers.Serializer):
@@ -60,103 +156,21 @@ class EmployeeSerializer(serializers.Serializer):
     sum = serializers.DecimalField(max_digits=12, decimal_places=2, source="revenue")
     avg_check = serializers.DecimalField(max_digits=12, decimal_places=2)
 
-class DiscountSerializer(serializers.Serializer):
-    discount_id = serializers.IntegerField()
-    discount_name = serializers.CharField()
-    sum = serializers.DecimalField(max_digits=12, decimal_places=2)
-    count = serializers.IntegerField()
-
-
-class DepartmentSerializer(serializers.Serializer):
-    department_id = serializers.IntegerField()
-    department_name = serializers.CharField()
-    sum = serializers.DecimalField(max_digits=12, decimal_places=2)
-    orders_count = serializers.IntegerField()
-
-
-
-class RevenueProfitSerializer(serializers.Serializer):
-    name = serializers.CharField()
-    count = serializers.FloatField(required=False)
-    revenue = serializers.FloatField(required=False)
-    profit = serializers.FloatField(required=False)
-    product_profit = serializers.FloatField(required=False)
 
 
 
 
 
 
-class StatisticsResponseSerializer(serializers.Serializer):
-    type = serializers.CharField()
-    data = serializers.ListField()
 
-    def to_representation(self, instance):
-        type_ = instance.get("type")
-        data = instance.get("data", [])
 
-        # Приведение к списку на случай, если пришёл один объект
-        if isinstance(data, dict):
-            data = [data]
 
-        if type_ == "products":
-            serialized_data = [
-                {
-                    "product_name": item.get("name", ""),
-                    "count": float(item.get("count", 0)),
-                    "product_profit": float(item.get("product_profit", 0)),
-                }
-                for item in data
-            ]
-        elif type_ == "categories":
-            serialized_data = [
-                {
-                    "category_name": item.get("name", ""),
-                    "count": float(item.get("count", 0)),
-                    "profit": float(item.get("profit", 0)),
-                }
-                for item in data
-            ]
-        elif type_ == "waiters":
-            serialized_data = [
-                {
-                    "employee_name": item.get("name", ""),
-                    "orders_count": int(item.get("transactions", 0)),
-                    "sum": float(item.get("revenue", 0)),
-                    "avg_check": float(item.get("avg_check", 0)),
-                    "profit": float(item.get("profit", 0)),
-                }
-                for item in data
-            ]
-        elif type_ == "clients":
-            serialized_data = [
-                {
-                    "name": item.get("name", ""),
-                    "email": item.get("email"),
-                    "visits": int(item.get("transactions", 0)),
-                    "sum": float(item.get("revenue", 0)),
-                    "avg_check": float(item.get("avg_check", 0)),
-                }
-                for item in data
-            ]
-        elif type_ == "workshops":
-            serialized_data = [
-                {
-                    "department_name": item.get("name", ""),
-                    "sum": round(int(item.get("sum", 0)) / 100, 2),
-                    "orders_count": int(item.get("count", 0)),
-                    "profit": round(int(item.get("profit", 0)) / 100, 2),
-                }
-                for item in data
-            ]    
-        else:
-            # Для остальных типов просто возвращаем данные как есть
-            serialized_data = data
 
-        return {
-            "type": type_,
-            "data": serialized_data
-        }
+
+
+
+
+
 
 
 
@@ -179,22 +193,23 @@ class CashShiftSerializer(serializers.Serializer):
 
 
 
-class TransactionHistorySerializer(serializers.Serializer):
-    transaction_id = serializers.CharField()
-    type_history = serializers.CharField()
-    time = serializers.CharField()
-    value = serializers.CharField(allow_null=True)
-    value2 = serializers.CharField(allow_null=True)
-    value3 = serializers.CharField(allow_null=True)
-    value_text = serializers.CharField(allow_null=True)
-    spot_tablet_id = serializers.CharField(allow_null=True)
+# class TransactionHistorySerializer(serializers.Serializer):
+#     transaction_id = serializers.CharField()
+#     type_history = serializers.CharField()
+#     time = serializers.CharField()
+#     value = serializers.CharField(allow_null=True)
+#     value2 = serializers.CharField(allow_null=True)
+#     value3 = serializers.CharField(allow_null=True)
+#     value_text = serializers.CharField(allow_null=True)
+#     spot_tablet_id = serializers.CharField(allow_null=True)
 
 
 
-class PaymentIDsSerialzer(serializers.Serializer):
-    payment_method_id = serializers.IntegerField()
-    title = serializers.CharField()
-    
-    
-    
+class ShiftSalesSerializer(serializers.Serializer):
+    shift_id = serializers.IntegerField()
+    regular = ProductAPISerializer(many=True)
+    delivery = ProductAPISerializer(many=True)  
+    difference = serializers.DecimalField(max_digits=12, decimal_places=2)
+    tips = serializers.FloatField()
+    tips_by_service = serializers.DictField(child=serializers.FloatField())
     

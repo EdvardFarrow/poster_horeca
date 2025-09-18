@@ -41,121 +41,121 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# def save_shift_sales_to_db(api_client, date_str, spot_id=None):
-#     """
-#     Сохраняет продажи по сменам в базу.
-#     Берет данные из метода get_sales_by_shift_with_delivery.
-#     """
-#     sales_by_shift = api_client.get_sales_by_shift_with_delivery(date_str, spot_id)
+def save_shift_sales_to_db(api_client, date_str, spot_id=None):
+    """
+    Сохраняет продажи по сменам в базу.
+    Берет данные из метода get_sales_by_shift_with_delivery.
+    """
+    sales_by_shift = api_client.get_sales_by_shift_with_delivery(date_str, spot_id)
 
-#     for shift_id, shift_data in sales_by_shift.items():
-#         shift_obj, _ = ShiftSale.objects.update_or_create(
-#             poster_shift_id=shift_id,
-#             date=date_str,
-#             defaults={
-#                 'total_revenue': round(sum(item['payed_sum'] for item in shift_data['regular']) +
-#                                         sum(item['payed_sum'] for item in shift_data['delivery']), 2),
-#                 'total_profit': round(sum(item['profit'] for item in shift_data['regular']) +
-#                                         sum(item['profit'] for item in shift_data['delivery']), 2),
-#                 'total_percentage': round((sum(item['profit'] for item in shift_data['regular']) +
-#                                             sum(item['profit'] for item in shift_data['delivery'])) /
-#                                             (sum(item['payed_sum'] for item in shift_data['regular']) +
-#                                            sum(item['payed_sum'] for item in shift_data['delivery']) or 1) * 100, 2),
-#                 'total_delivery_revenue': round(sum(item['payed_sum'] for item in shift_data['delivery']), 2),
-#                 'total_delivery_profit': round(sum(item['profit'] for item in shift_data['delivery']), 2),
-#                 'tips': round(shift_data.get('tips', 0.0), 2),
-#             }
-#         )
+    for shift_id, shift_data in sales_by_shift.items():
+        shift_obj, _ = ShiftSale.objects.update_or_create(
+            poster_shift_id=shift_id,
+            date=date_str,
+            defaults={
+                'total_revenue': round(sum(item['payed_sum'] for item in shift_data['regular']) +
+                                        sum(item['payed_sum'] for item in shift_data['delivery']), 2),
+                'total_profit': round(sum(item['profit'] for item in shift_data['regular']) +
+                                        sum(item['profit'] for item in shift_data['delivery']), 2),
+                'total_percentage': round((sum(item['profit'] for item in shift_data['regular']) +
+                                            sum(item['profit'] for item in shift_data['delivery'])) /
+                                            (sum(item['payed_sum'] for item in shift_data['regular']) +
+                                           sum(item['payed_sum'] for item in shift_data['delivery']) or 1) * 100, 2),
+                'total_delivery_revenue': round(sum(item['payed_sum'] for item in shift_data['delivery']), 2),
+                'total_delivery_profit': round(sum(item['profit'] for item in shift_data['delivery']), 2),
+                'tips': round(shift_data.get('tips', 0.0), 2),
+            }
+        )
 
-#         for category in ['regular', 'delivery']:
-#             for product in shift_data[category]:
-#                 ShiftSaleItem.objects.update_or_create(
-#                     shift_sale=shift_obj,
-#                     product_name=product.get('product_name') or "",
-#                     defaults={
-#                         'quantity': product.get('count', 0),
-#                         'price': product.get('product_sum', 0.0),
-#                         'paid_sum': product.get('payed_sum', 0.0),
-#                         'profit': product.get('profit', 0.0),
-#                         'department': product.get('workshop'),
-#                         'category_name': category,
-#                         'delivery_service': product.get('delivery_service') if category == 'delivery' else None
-#                     }
-#                 )
-
-
-
-
-# def save_cash_shifts_range(api_client, start_date: str, end_date: str = None, spot_id: int = None):
-#     """Сохраняет кассовые смены из API в таблицу CashShiftReport
-#     для диапазона дат от start_date до end_date (включительно)
-
-#     Args:
-#         api_client (_type_): PosterApiClient
-#         start_date (str): start_date
-#         end_date (str, optional): end_date. Defaults to None.
-#         spot_id (int, optional): spot_id. Defaults to None.
-#     """
-#     end_date = end_date or start_date
-#     start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-#     end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-
-#     current_date = start_dt
-#     while current_date <= end_dt:
-#         date_str = current_date.strftime("%Y-%m-%d")
-#         shifts = api_client.get_cash_shifts(date_from=date_str, date_to=date_str, spot_id=spot_id)
-
-#         for shift in shifts:
-#             date_start = None
-#             date_end = None
-#             try:
-#                 date_start = datetime.strptime(shift['date_start'], "%Y-%m-%d %H:%M:%S")
-#             except Exception:
-#                 pass
-#             try:
-#                 if shift['date_end'] and shift['date_end'] != '0000-00-00 00:00:00':
-#                     date_end = datetime.strptime(shift['date_end'], "%Y-%m-%d %H:%M:%S")
-#             except Exception:
-#                 pass
-
-#             total_sales = round((shift.get('amount_sell_cash', 0) or 0) + (shift.get('amount_sell_card', 0) or 0), 2)
-
-#             CashShiftReport.objects.update_or_create(
-#                 poster_shift_id=shift['poster_shift_id'],
-#                 defaults={
-#                     'date_start': date_start,
-#                     'date_end': date_end,
-#                     'cash_start': shift.get('amount_start', 0),
-#                     'cash_end': shift.get('amount_end', 0),
-#                     'amount_debit': shift.get('amount_debit', 0),
-#                     'amount_sell_cash': shift.get('amount_sell_cash', 0),
-#                     'amount_sell_card': shift.get('amount_sell_card', 0),
-#                     'amount_credit': shift.get('amount_credit', 0),
-#                     'amount_collection': shift.get('amount_collection', 0),
-#                     'total_sales': total_sales,
-#                     'comment': shift.get('comment'),
-#                     'user_id_start': shift.get('user_id_start'),
-#                     'user_id_end': shift.get('user_id_end'),
-#                 }
-#             )
-
-#         current_date += timedelta(days=1)
+        for category in ['regular', 'delivery']:
+            for product in shift_data[category]:
+                ShiftSaleItem.objects.update_or_create(
+                    shift_sale=shift_obj,
+                    product_name=product.get('product_name') or "",
+                    defaults={
+                        'quantity': product.get('count', 0),
+                        'price': product.get('product_sum', 0.0),
+                        'paid_sum': product.get('payed_sum', 0.0),
+                        'profit': product.get('profit', 0.0),
+                        'department': product.get('workshop'),
+                        'category_name': category,
+                        'delivery_service': product.get('delivery_service') if category == 'delivery' else None
+                    }
+                )
 
 
 
-# def save_sales_from_august(api_client, spot_id=None):
-#     """
-#     Запускает сохранение продаж по сменам
-#     начиная с 1 августа 2025 года до сегодняшнего дня включительно.
-#     """
-#     start_date = date(2025, 8, 1)
-#     end_date = date.today()
 
-#     current_date = start_date
-#     while current_date <= end_date:
-#         date_str = current_date.strftime("%Y-%m-%d")
-#         save_shift_sales_to_db(api_client, date_str, spot_id)
-#         current_date += timedelta(days=1)
+def save_cash_shifts_range(api_client, start_date: str, end_date: str = None, spot_id: int = None):
+    """Сохраняет кассовые смены из API в таблицу CashShiftReport
+    для диапазона дат от start_date до end_date (включительно)
+
+    Args:
+        api_client (_type_): PosterApiClient
+        start_date (str): start_date
+        end_date (str, optional): end_date. Defaults to None.
+        spot_id (int, optional): spot_id. Defaults to None.
+    """
+    end_date = end_date or start_date
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+
+    current_date = start_dt
+    while current_date <= end_dt:
+        date_str = current_date.strftime("%Y-%m-%d")
+        shifts = api_client.get_cash_shifts(date_from=date_str, date_to=date_str, spot_id=spot_id)
+
+        for shift in shifts:
+            date_start = None
+            date_end = None
+            try:
+                date_start = datetime.strptime(shift['date_start'], "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+            try:
+                if shift['date_end'] and shift['date_end'] != '0000-00-00 00:00:00':
+                    date_end = datetime.strptime(shift['date_end'], "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+
+            total_sales = round((shift.get('amount_sell_cash', 0) or 0) + (shift.get('amount_sell_card', 0) or 0), 2)
+
+            CashShiftReport.objects.update_or_create(
+                poster_shift_id=shift['poster_shift_id'],
+                defaults={
+                    'date_start': date_start,
+                    'date_end': date_end,
+                    'cash_start': shift.get('amount_start', 0),
+                    'cash_end': shift.get('amount_end', 0),
+                    'amount_debit': shift.get('amount_debit', 0),
+                    'amount_sell_cash': shift.get('amount_sell_cash', 0),
+                    'amount_sell_card': shift.get('amount_sell_card', 0),
+                    'amount_credit': shift.get('amount_credit', 0),
+                    'amount_collection': shift.get('amount_collection', 0),
+                    'total_sales': total_sales,
+                    'comment': shift.get('comment'),
+                    'user_id_start': shift.get('user_id_start'),
+                    'user_id_end': shift.get('user_id_end'),
+                }
+            )
+
+        current_date += timedelta(days=1)
+
+
+
+def save_sales_from_august(api_client, spot_id=None):
+    """
+    Запускает сохранение продаж по сменам
+    начиная с 1 августа 2025 года до сегодняшнего дня включительно.
+    """
+    start_date = date(2025, 8, 1)
+    end_date = date.today()
+
+    current_date = start_date
+    while current_date <= end_date:
+        date_str = current_date.strftime("%Y-%m-%d")
+        save_shift_sales_to_db(api_client, date_str, spot_id)
+        current_date += timedelta(days=1)
 
 
 
@@ -292,9 +292,8 @@ def parse_poster_datetime(value):
     if value is None:
         return None
     try:
-        # если число — считаем как timestamp в миллисекундах
         ts = int(value)
-        if ts > 1e12:  # иногда приходит в микросекундах
+        if ts > 1e12:  
             ts = ts / 1000
         return datetime.fromtimestamp(ts)
     except Exception:
@@ -307,16 +306,11 @@ def parse_poster_datetime(value):
 
 # ------------------ Сохранение транзакций ------------------
 def save_transactions(data: list[dict]) -> int:
-    """
-    Сохраняет список транзакций в базу (Transactions).
-    Возвращает количество новых созданных записей.
-    """
     saved_count = 0
 
     for item in data:
         client_info = item.get("client", {})
 
-        # преобразуем даты в aware datetime
         date_start = parse_poster_datetime(item.get("date_start"))
         date_close = parse_poster_datetime(item.get("date_close"))
 
@@ -346,14 +340,12 @@ def save_transactions(data: list[dict]) -> int:
                 "processing_status": item.get("processing_status"),
             }
         )
-
         if created:
             saved_count += 1
 
     return saved_count
 
-
-# ------------------ Сохранение истории чека ------------------
+# ------------------ Сохранение истории ------------------
 def save_transaction_history(transaction_id: int, history_data: list[dict]) -> int:
     saved_count = 0
     try:
@@ -364,6 +356,9 @@ def save_transaction_history(transaction_id: int, history_data: list[dict]) -> i
 
     for h in history_data:
         history_time = parse_poster_datetime(h.get("time"))
+        if timezone.is_naive(history_time):
+            history_time = timezone.make_aware(history_time)
+
         try:
             value_text = json.loads(h.get("value_text") or "{}")
         except Exception:
@@ -385,8 +380,7 @@ def save_transaction_history(transaction_id: int, history_data: list[dict]) -> i
             saved_count += 1
     return saved_count
 
-
-# ------------------ Сохранение продуктов из транзакций ------------------
+# ------------------ Сохранение продуктов ------------------
 def save_transactions_products(products_data: list[dict]):
     for item in products_data:
         try:
@@ -431,7 +425,18 @@ def save_transactions_products(products_data: list[dict]):
                 "product_cost": float(item.get("product_cost", 0)),
                 "product_profit": float(item.get("product_profit", 0)),
             }
-        )        
+        )
+
+# ------------------ Очистка старых транзакций ------------------
+def delete_old_transactions():
+    one_month_ago = timezone.now() - timedelta(days=30)
+    old_tx_ids = Transactions.objects.filter(date_close__lt=one_month_ago).values_list('id', flat=True)
+
+    TransactionsProducts.objects.filter(transaction_id__in=old_tx_ids).delete()
+    TransactionHistory.objects.filter(transaction_id__in=old_tx_ids).delete()
+    Transactions.objects.filter(date_close__lt=one_month_ago).delete()
+    
+    
         
 def save_workshops(workshops_data: list[dict]):
     """
@@ -512,33 +517,38 @@ def save_clients(clients_data: list[dict]) -> int:
 
 
 
-async def sync_poster_day(api_client, date_str: str, spot_id: int = None):
+def sync_poster_day(api_client, date_str: str, spot_id: int = None):
     # 1. Получаем транзакции
     transactions_data = api_client.get_transactions(date_from=date_str, date_to=date_str, spot_id=spot_id)
     if not transactions_data:
         logger.warning(f"No transactions found for {date_str}")
         return
 
-    await sync_to_async(save_transactions)(transactions_data)
+    save_transactions(transactions_data)
     transaction_ids = [tx["transaction_id"] for tx in transactions_data if "transaction_id" in tx]
 
     if transaction_ids:
-        # 2. Получаем историю чеков
-        histories = await api_client.fetch_all_histories(transaction_ids)
-        for tx_id, history_actions, _, _ in histories:
-            await sync_to_async(save_transaction_history)(int(tx_id), history_actions)
+        histories = []
+        for tx_id in transaction_ids:
+            response = api_client.make_request(
+                "GET",
+                "dash.getTransactionHistory",
+                params={"transaction_id": tx_id}
+            ).get("response", [])
+            histories.append((tx_id, response, None, None))  
 
-        # 3. Получаем продукты
+        for tx_id, history_actions, _, _ in histories:
+            save_transaction_history(int(tx_id), history_actions)
+
+        
         products_data = api_client.get_transactions_products(transaction_ids)
-        await sync_to_async(save_transactions_products)(products_data)
+        save_transactions_products(products_data)
 
     logger.info(f"Sync finished for {date_str}, transactions: {len(transaction_ids)}")
-    
-    
-async def sync_poster_from_august(api_client, spot_id: int = None):
-    """
-    Синхронизирует данные с августа 2025 до текущей даты.
-    """
+
+
+# ------------------ Синхронный sync_poster_from_august ------------------
+def sync_poster_from_august(api_client, spot_id: int = None):
     start_date = datetime(2025, 8, 1)
     end_date = datetime.now()
     current_date = start_date
@@ -547,9 +557,90 @@ async def sync_poster_from_august(api_client, spot_id: int = None):
         date_str = current_date.strftime("%Y-%m-%d")
         try:
             logger.info(f"Syncing Poster data for {date_str}")
-            await sync_poster_day(api_client, date_str, spot_id)
+            sync_poster_day(api_client, date_str, spot_id)
         except Exception as e:
             logger.error(f"Failed to sync {date_str}: {e}")
         current_date += timedelta(days=1)
 
     logger.info("All Poster data synced from August 2025 to today.")
+    
+    
+    
+    
+def sync_all_from_date(api_client, start_date: str, spot_id: int = None):
+    """
+    Синхронизирует все данные из Poster API с указанной даты до сегодняшнего дня.
+    Всегда обновляет существующие записи или создает новые.
+    """
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
+    end_dt = date.today()
+    current_date = start_dt
+
+    while current_date <= end_dt:
+        date_str = current_date.strftime("%Y-%m-%d")
+        logger.info(f"Syncing all Poster data for {date_str}")
+
+        try:
+            # Кассовые смены
+            save_cash_shifts_range(api_client, date_str, spot_id)
+
+            # Продажи по сменам
+            save_shift_sales_to_db(api_client, date_str, spot_id)
+
+            # Транзакции
+            transactions_data = api_client.get_transactions(date_from=date_str, date_to=date_str, spot_id=spot_id)
+            if transactions_data:
+                save_transactions(transactions_data)
+                transaction_ids = [tx["transaction_id"] for tx in transactions_data if "transaction_id" in tx]
+
+                # История транзакций
+                for tx_id in transaction_ids:
+                    history = api_client.make_request(
+                        "GET",
+                        "dash.getTransactionHistory",
+                        params={"transaction_id": tx_id}
+                    ).get("response", [])
+                    save_transaction_history(tx_id, history)
+
+                # Продукты транзакций
+                products_data = api_client.get_transactions_products(transaction_ids)
+                save_transactions_products(products_data)
+
+            # Продукты
+            if hasattr(api_client, "get_products"):
+                products_data = api_client.get_products()
+                if products_data:
+                    save_products(products_data)
+                    save_products_sales(products_data)
+
+            # Категории
+            if hasattr(api_client, "get_categories"):
+                categories_data = api_client.get_categories()
+                if categories_data:
+                    save_categories(categories_data)
+                    save_categories_sales(categories_data)
+
+            # Клиенты
+            if hasattr(api_client, "get_clients"):
+                clients_data = api_client.get_clients(date_from=date_str, date_to=date_str)
+                if clients_data:
+                    save_clients(clients_data)
+
+            # Мастерские
+            if hasattr(api_client, "get_workshops"):
+                workshops_data = api_client.get_workshops()
+                if workshops_data:
+                    save_workshops(workshops_data)
+
+            # Методы оплаты
+            if hasattr(api_client, "get_payment_methods"):
+                payments_data = api_client.get_payment_methods()
+                if payments_data:
+                    save_payment_methods(payments_data)
+
+        except Exception as e:
+            logger.error(f"Failed to sync {date_str}: {e}")
+
+        current_date += timedelta(days=1)
+
+    logger.info(f"All Poster data synced from {start_date} to today.")

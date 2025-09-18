@@ -138,39 +138,9 @@ class ClientSerializer(serializers.ModelSerializer):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 class EmployeeSerializer(serializers.Serializer):
     employee_id = serializers.IntegerField(source="id")
     employee_name = serializers.CharField(source="name")
-    orders_count = serializers.IntegerField(source="transactions")
-    sum = serializers.DecimalField(max_digits=12, decimal_places=2, source="revenue")
-    avg_check = serializers.DecimalField(max_digits=12, decimal_places=2)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -205,11 +175,23 @@ class CashShiftSerializer(serializers.Serializer):
 
 
 
+
+
+class ShiftSaleItemSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField(required=False, allow_null=True)
+    product_name = serializers.CharField(allow_blank=True, required=False)
+    count = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
+    product_sum = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
+    payed_sum = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
+    profit = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
+    workshop = serializers.CharField(allow_blank=True, required=False, allow_null=True)
+    delivery_service = serializers.CharField(allow_blank=True, required=False, allow_null=True)
+    tips = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+
 class ShiftSalesSerializer(serializers.Serializer):
-    shift_id = serializers.IntegerField()
-    regular = ProductAPISerializer(many=True)
-    delivery = ProductAPISerializer(many=True)  
+    regular = ShiftSaleItemSerializer(many=True)
+    delivery = ShiftSaleItemSerializer(many=True)
     difference = serializers.DecimalField(max_digits=12, decimal_places=2)
-    tips = serializers.FloatField()
-    tips_by_service = serializers.DictField(child=serializers.FloatField())
-    
+    tips = serializers.DecimalField(max_digits=12, decimal_places=2)
+    tips_by_service = serializers.DictField(child=serializers.DecimalField(max_digits=12, decimal_places=2))

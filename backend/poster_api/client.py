@@ -563,7 +563,7 @@ class PosterAPIClient:
         ]
 
 
-    async def get_full_transactions_for_day(self, date_from: str, date_to: str, spot_id: int = None) -> list[dict]:
+    def get_full_transactions_for_day(self, date_from: str, date_to: str, spot_id: int = None) -> list[dict]:
 
         transactions = self.get_transactions(date_from=date_from, date_to=date_to, spot_id=spot_id)
 

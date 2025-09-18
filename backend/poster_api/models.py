@@ -170,7 +170,7 @@ class ShiftSaleItem(models.Model):
     
     product_name = models.CharField(max_length=255)
     quantity = models.DecimalField(max_digits=8, decimal_places=2, default=0)
-    price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    product_sum = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     paid_sum = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     profit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     

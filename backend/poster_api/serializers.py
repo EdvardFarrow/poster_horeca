@@ -195,3 +195,15 @@ class ShiftSalesSerializer(serializers.Serializer):
     difference = serializers.DecimalField(max_digits=12, decimal_places=2)
     tips = serializers.DecimalField(max_digits=12, decimal_places=2)
     tips_by_service = serializers.DictField(child=serializers.DecimalField(max_digits=12, decimal_places=2))
+    
+    
+    
+    
+class WorkshopForFrontendSerializer(serializers.Serializer):
+    id = serializers.IntegerField(source='workshop_id')
+    name = serializers.CharField(source='workshop_name')
+
+class ProductForFrontendSerializer(serializers.Serializer):
+    id = serializers.IntegerField(source='product_id')
+    name = serializers.CharField(source='product_name')
+    workshop_id = serializers.IntegerField(source='workshop') 

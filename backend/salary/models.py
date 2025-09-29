@@ -1,20 +1,25 @@
 from django.db import models
 from django.conf import settings
-from poster_api.models import CashShiftReport
+from poster_api.models import CashShiftReport, Product
 from users.models import Employee, Role
+from poster_api.models import Workshop
 
 
 
 class SalaryRule(models.Model):
-    role = models.ForeignKey(Role, on_delete=models.CASCADE,default=None)
-    category_name = models.CharField(max_length=255, blank=True, null=True)  
-    percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)  # % от выручки
-    fixed_per_shift = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # фикс за смену
-    fixed_per_item = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # фикс за товар (например, кальян)
-    product_name = models.CharField(max_length=255, blank=True, null=True)  # например, "Кальян на грейпфруте"
+    role = models.ForeignKey(Role, on_delete=models.CASCADE)
+    workshops = models.ManyToManyField(Workshop, blank=True)
+    products = models.ManyToManyField(Product, through='SalaryRuleProduct', blank=True)
+    percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    fixed_per_shift = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     def __str__(self):
         return f"Правило для {self.role}"
+
+class SalaryRuleProduct(models.Model):
+    salary_rule = models.ForeignKey(SalaryRule, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    fixed = models.DecimalField(max_digits=10, decimal_places=2, default=0, blank=True, null=True)
 
 
 

@@ -7,46 +7,25 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from asgiref.sync import sync_to_async, async_to_sync
 
+from .models import Product, Workshop
+
 from .client import PosterAPIClient
-from .serializers import CashShiftSerializer, ShiftSalesSerializer, TransactionHistorySerializer
+from .serializers import (
+    CashShiftSerializer,
+    PaymentMethodSerializer, 
+    ProductAPISerializer,
+    ProductForFrontendSerializer, 
+    ShiftSalesSerializer, 
+    TransactionHistorySerializer,
+    WorkshopForFrontendSerializer, 
+    WorkshopSerializer
+    )
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class StatisticsView(viewsets.ViewSet):
-    def list(self, request):
-        type_ = request.query_params.get("type", "waiters")
-        date_from = request.query_params.get("dateFrom")
-        date_to = request.query_params.get("dateTo")
-        entity_id = request.query_params.get("id")
 
-        logger.info(f"Received params: {request.query_params}")
-
-        client = PosterAPIClient()
-
-        try:
-            if type_ == "products":
-                raw_data = client.get_products_sales(date_from=date_from, date_to=date_to, spot_id=entity_id)
-            elif type_ == "categories":
-                raw_data = client.get_categories_sales(date_from=date_from, date_to=date_to, spot_id=entity_id)
-            elif type_ == "waiters":
-                raw_data = client.get_waiters_sales(date_from=date_from, date_to=date_to, spot_id=entity_id)
-            elif type_ == "clients":
-                raw_data = client.get_clients_sales(date_from=date_from, date_to=date_to, spot_id=entity_id)
-            
-
-            else:
-                return Response(
-                    {"error": f"Unknown type '{type_}'"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            serializer = StatisticsResponseSerializer({"type": type_, "data": raw_data})
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 
@@ -155,7 +134,15 @@ class PaymentMethodsView(viewsets.ViewSet):
     def list(self, request, *args, **kwargs):
         client = PosterAPIClient()
         payments_data = client.get_payments_id()
-        serializer = PaymentIDsSerialzer(payments_data, many=True)
+        serializer = PaymentMethodSerializer(payments_data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     
+
+class WorkshopViewSet(viewsets.ModelViewSet):
+    queryset = Workshop.objects.all()
+    serializer_class = WorkshopForFrontendSerializer
+
+class ProductViewSet(viewsets.ModelViewSet):
+    queryset = Product.objects.all()
+    serializer_class = ProductForFrontendSerializer

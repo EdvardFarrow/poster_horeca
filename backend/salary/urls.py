@@ -3,10 +3,10 @@ from rest_framework.routers import DefaultRouter
 from .views import PosterEmployeesViewSet, SalaryRuleViewSet, SalaryRecordViewSet
 
 rules_router = DefaultRouter()
-rules_router.register(r'rules', SalaryRuleViewSet, basename='salary-rule')
+rules_router.register(r'salary_rules', SalaryRuleViewSet, basename='salary_rules')
 
 records_router = DefaultRouter()
-records_router.register(r'records', SalaryRecordViewSet, basename='salary-record')
+records_router.register(r'salary_records', SalaryRecordViewSet, basename='salary_records')
 
 employees_router = DefaultRouter()
 employees_router.register(r'employees', PosterEmployeesViewSet, basename='poster-employee')

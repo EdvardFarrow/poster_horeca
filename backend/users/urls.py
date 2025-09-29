@@ -4,12 +4,23 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenBlacklistView
 )
-from .views import RegisterView, UserViewSet, MeView
+from .views import (
+    RegisterView, 
+    UserViewSet, 
+    MeView,
+    EmployeeViewSet,
+    RoleViewSet
+    )
+
 from rest_framework.routers import DefaultRouter
 
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet, basename='user')
+
+emp_role_router = DefaultRouter()
+emp_role_router.register(r'employee', EmployeeViewSet, basename='employee')
+emp_role_router.register(r'role', RoleViewSet, basename='role')
 
 
 
@@ -21,4 +32,5 @@ urlpatterns = [
     path('logout/', TokenBlacklistView.as_view(), name='logout'),
     path("me/", MeView.as_view(), name="me"),
     path('', include(router.urls)),
+    path('', include(emp_role_router.urls)),
 ]

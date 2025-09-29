@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User
+from .models import User, Employee, Role
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -25,4 +25,20 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'fullname', 'role']
+        
+        
+        
+
+
+class RoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Role
+        fields = ["id", "name", "description"]
+
+class EmployeeSerializer(serializers.ModelSerializer):
+    role_name = serializers.CharField(source="role.name", read_only=True)
+
+    class Meta:
+        model = Employee
+        fields = ["id", "name", "role", "role_name", "is_active"]
         

@@ -6,12 +6,16 @@ from rest_framework.response import Response
 
 from calendar import day_name
 from rest_framework.permissions import IsAuthenticated
+import logging
 
 
-
+from poster_api.models import Product
 from poster_api.client import PosterAPIClient
 from .models import SalaryRecord, SalaryRule, SalaryRuleProduct
 from .serializers import PosterEmployeeSerializer, SalaryRecordSerializer, SalaryRuleSerializer
+
+logger = logging.getLogger(__name__)
+
 
 class SalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = SalaryRecord.objects.all()
@@ -82,43 +86,4 @@ class SalaryRuleViewSet(viewsets.ModelViewSet):
     serializer_class = SalaryRuleSerializer
     permission_classes = [IsAuthenticated]
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        salary_rule = serializer.save()
-
-        workshops = request.data.get("workshops", [])
-        if workshops:
-            salary_rule.workshops.set(workshops)
-
-        for pf in request.data.get("product_fixed", []):
-            SalaryRuleProduct.objects.create(
-                salary_rule=salary_rule,
-                product_id=pf.get("product"),
-                fixed=pf.get("fixed", 0)
-            )
-
-        headers = self.get_success_headers(serializer.data)
-        return Response(self.get_serializer(salary_rule).data, status=status.HTTP_201_CREATED, headers=headers)
-
-    def update(self, request, *args, **kwargs):
-        salary_rule = self.get_object()
-        serializer = self.get_serializer(salary_rule, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        salary_rule = serializer.save()
-
-        workshops = request.data.get("workshops", [])
-        if workshops is not None:
-            salary_rule.workshops.set(workshops)
-
-        product_fixed = request.data.get("product_fixed", None)
-        if product_fixed is not None:
-            SalaryRuleProduct.objects.filter(salary_rule=salary_rule).delete()
-            for pf in product_fixed:
-                SalaryRuleProduct.objects.create(
-                    salary_rule=salary_rule,
-                    product_id=pf.get("product"),
-                    fixed=pf.get("fixed", 0)
-                )
-
-        return Response(self.get_serializer(salary_rule).data)
+    

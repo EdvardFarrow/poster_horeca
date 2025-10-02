@@ -6,15 +6,18 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from asgiref.sync import sync_to_async, async_to_sync
+from rest_framework.permissions import AllowAny
+from rest_framework.authentication import SessionAuthentication
 
-from .models import Product, Workshop
+from .models import Product, ShiftSale, Workshop
 
 from .client import PosterAPIClient
 from .serializers import (
     CashShiftSerializer,
     PaymentMethodSerializer, 
     ProductAPISerializer,
-    ProductForFrontendSerializer, 
+    ProductForFrontendSerializer,
+    ShiftSaleItemSerializer, 
     ShiftSalesSerializer, 
     TransactionHistorySerializer,
     WorkshopForFrontendSerializer, 
@@ -80,8 +83,9 @@ class ShiftSalesView(viewsets.ViewSet):
 
         serialized_data = []
         for shift_id, sales in data.items():
+            shift_obj = ShiftSale.objects.get(shift_id=shift_id)
             serialized_data.append({
-                'poster_shift_id': shift_id,
+                'shift_id': shift_obj.id,
                 'regular': sales.get('regular', []),
                 'delivery': sales.get('delivery', []),
                 'difference': sales.get('difference', 0),
@@ -92,6 +96,32 @@ class ShiftSalesView(viewsets.ViewSet):
 
         serializer = ShiftSalesSerializer(serialized_data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+
+class SaveShiftSalesView(viewsets.ViewSet):
+    permission_classes = [AllowAny]
+    
+    
+    def create(self, request):
+        items = request.data.get("items", [])
+        logger.info(f"Получено {len(items)} items: {items}")
+        
+        created = []
+        for idx, item in enumerate(items):
+            serializer = ShiftSaleItemSerializer(data=item)
+            if serializer.is_valid():
+                serializer.save()
+                created.append(serializer.data)
+            else:
+                logger.error(f"Ошибка сериализатора для item {idx}: {serializer.errors}")
+                return Response(
+                    {"error_index": idx, "errors": serializer.errors}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        logger.info(f"Успешно создано {len(created)} элементов")
+        return Response({"created": created}, status=status.HTTP_201_CREATED)
 
 
 

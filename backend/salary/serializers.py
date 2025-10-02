@@ -10,6 +10,7 @@ class SalaryRuleProductSerializer(serializers.ModelSerializer):
     product = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.all(), source='product_obj'
     )
+    
 
     def to_internal_value(self, data):
         try:
@@ -28,7 +29,7 @@ class SalaryRuleProductSerializer(serializers.ModelSerializer):
 
 class SalaryRuleSerializer(serializers.ModelSerializer):
     workshops = serializers.PrimaryKeyRelatedField(queryset=Workshop.objects.all(), many=True)
-    product_fixed = SalaryRuleProductSerializer(many=True, write_only=True, required=False)
+    product_fixed = SalaryRuleProductSerializer(many=True, required=False)
     role_name = serializers.CharField(source="role.name", read_only=True)
 
     class Meta:
@@ -73,6 +74,7 @@ class SalaryRuleSerializer(serializers.ModelSerializer):
 
         return instance
 
+    
 
 
 

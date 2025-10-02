@@ -86,4 +86,7 @@ class SalaryRuleViewSet(viewsets.ModelViewSet):
     serializer_class = SalaryRuleSerializer
     permission_classes = [IsAuthenticated]
 
-    
+    def destroy(self, request, *args, **kwargs):
+        salary_rule = self.get_object()
+        salary_rule.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

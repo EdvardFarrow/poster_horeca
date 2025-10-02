@@ -167,14 +167,14 @@ class ShiftSale(models.Model):
     
 class ShiftSaleItem(models.Model):
     shift_sale = models.ForeignKey(ShiftSale, related_name="items", on_delete=models.CASCADE)
-    
+
     product_name = models.CharField(max_length=255)
-    quantity = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    count = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     product_sum = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    paid_sum = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    payed_sum = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     profit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    
-    department = models.CharField(max_length=255, blank=True, null=True)
+    workshop = models.CharField(max_length=255, blank=True, null=True)
     category_name = models.CharField(max_length=255, blank=True, null=True)
     delivery_service = models.CharField(max_length=255, blank=True, null=True)
+    tips = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     

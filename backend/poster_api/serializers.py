@@ -177,19 +177,23 @@ class CashShiftSerializer(serializers.Serializer):
 
 
 
-class ShiftSaleItemSerializer(serializers.Serializer):
-    product_id = serializers.IntegerField(required=False, allow_null=True)
-    product_name = serializers.CharField(allow_blank=True, required=False)
-    count = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
-    product_sum = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
-    payed_sum = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
-    profit = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
-    workshop = serializers.CharField(allow_blank=True, required=False, allow_null=True)
-    delivery_service = serializers.CharField(allow_blank=True, required=False, allow_null=True)
-    tips = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
+class ShiftSaleItemSerializer(serializers.ModelSerializer):
+    shift_sale = serializers.PrimaryKeyRelatedField(
+        queryset=ShiftSale.objects.all(),
+        write_only=True,
+        
+    )
 
+    class Meta:
+        model = ShiftSaleItem
+        fields = [
+            "shift_sale", "product_name", "count", "product_sum",
+            "payed_sum", "profit", "workshop", "category_name",
+            "delivery_service", "tips"
+        ]
 
 class ShiftSalesSerializer(serializers.Serializer):
+    shift_id = serializers.IntegerField()
     regular = ShiftSaleItemSerializer(many=True)
     delivery = ShiftSaleItemSerializer(many=True)
     difference = serializers.DecimalField(max_digits=12, decimal_places=2)

@@ -538,13 +538,7 @@ class PosterAPIClient:
                 'tips': sales['tips'],
                 'tips_by_service': tips_by_service
             }
-            logger.debug(
-                "SHIFT %s - DELIVERY: %s, TIPS: %s",
-                shift_id,
-                json.dumps(final_result[shift_id]['delivery'], ensure_ascii=False)[:2000],
-                final_result[shift_id]['tips'],
-                final_result[shift_id]['tips_by_service']
-            )
+            
 
         return final_result
 

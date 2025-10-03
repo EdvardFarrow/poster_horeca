@@ -9,15 +9,14 @@ class Employee(models.Model):
 
 class Category(models.Model):
     category_id = models.IntegerField(unique=True)
-    name = models.CharField(max_length=255)
+    category_name = models.CharField(max_length=255, null=True)
 
     def __str__(self):
-        return self.name
+        return self.category_name
     
 
 class CategoriesSales(models.Model):
-    category_id = models.IntegerField(unique=True, default=1)
-    category_name = models.CharField(max_length=225, default="")
+    category = models.ForeignKey(Category, on_delete=models.SET_DEFAULT, default=1)    
     profit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     count = models.IntegerField(default=0)    
 
@@ -152,7 +151,7 @@ class CashShiftReport(models.Model):
 class ShiftSale(models.Model):
     shift_id = models.IntegerField()
     date = models.DateField()
-    
+
     total_revenue = models.DecimalField(max_digits=12, decimal_places=2, default=0.0)
     total_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0.0)
     total_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)

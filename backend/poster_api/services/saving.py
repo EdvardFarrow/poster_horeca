@@ -50,7 +50,7 @@ def save_shift_sales_to_db(api_client, date_str, spot_id=None):
 
     for shift_id, shift_data in sales_by_shift.items():
         shift_obj, _ = ShiftSale.objects.update_or_create(
-            poster_shift_id=shift_id,
+            shift_id=shift_id,
             date=date_str,
             defaults={
                 'total_revenue': round(sum(item['payed_sum'] for item in shift_data['regular']) +
@@ -69,24 +69,34 @@ def save_shift_sales_to_db(api_client, date_str, spot_id=None):
 
         for category in ['regular', 'delivery']:
             for product in shift_data[category]:
-                ShiftSaleItem.objects.update_or_create(
-                    shift_sale=shift_obj,
-                    product_name=product.get('product_name') or "",
-                    defaults={
-                        'quantity': product.get('count', 0),
-                        'price': product.get('product_sum', 0.0),
-                        'paid_sum': product.get('payed_sum', 0.0),
-                        'profit': product.get('profit', 0.0),
-                        'department': product.get('workshop'),
-                        'category_name': category,
-                        'delivery_service': product.get('delivery_service') if category == 'delivery' else None
-                    }
-                )
+                logger.info(f"Processing shift_id={shift_id}, product_name={product.get('product_name')}, "
+                            f"workshop={product.get('workshop')}, category={category}, "
+                            f"delivery_service={product.get('delivery_service')}, tips={product.get('tips')}")
+                
+                try:
+                    ShiftSaleItem.objects.update_or_create(
+                        shift_sale=shift_obj,
+                        product_name=product.get('product_name') or "",
+                        defaults={
+                            'count': product.get('count', 0),
+                            'product_sum': product.get('product_sum', 0.0),
+                            'payed_sum': product.get('payed_sum', 0.0),
+                            'profit': product.get('profit', 0.0),
+                            'workshop': product.get('workshop'),
+                            'category_name': category,
+                            'delivery_service': product.get('delivery_service') if category == 'delivery' else None,
+                            'tips': product.get('tips', 0.0),
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"❌ Error saving ShiftSaleItem for shift_id={shift_id}, "
+                                f"product_name={product.get('product_name')}, error={e}")
+                    continue
 
 
 
 
-def save_cash_shifts_range(api_client, start_date: str, end_date: str = None, spot_id: int = None):
+def save_cash_shifts_range(api_client, start_date: str, spot_id: int = None, end_date: str = None):
     """Сохраняет кассовые смены из API в таблицу CashShiftReport
     для диапазона дат от start_date до end_date (включительно)
 
@@ -97,8 +107,8 @@ def save_cash_shifts_range(api_client, start_date: str, end_date: str = None, sp
         spot_id (int, optional): spot_id. Defaults to None.
     """
     end_date = end_date or start_date
-    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    start_dt = datetime.strptime(str(start_date), "%Y-%m-%d")
+    end_dt = datetime.strptime(str(end_date), "%Y-%m-%d")
 
     current_date = start_dt
     while current_date <= end_dt:
@@ -108,13 +118,19 @@ def save_cash_shifts_range(api_client, start_date: str, end_date: str = None, sp
         for shift in shifts:
             date_start = None
             date_end = None
+
+            # Обработка даты начала смены
             try:
-                date_start = datetime.strptime(shift['date_start'], "%Y-%m-%d %H:%M:%S")
+                date_start_naive = datetime.strptime(shift['date_start'], "%Y-%m-%d %H:%M:%S")
+                date_start = timezone.make_aware(date_start_naive, timezone.get_current_timezone())
             except Exception:
                 pass
+
+            # Обработка даты конца смены
             try:
-                if shift['date_end'] and shift['date_end'] != '0000-00-00 00:00:00':
-                    date_end = datetime.strptime(shift['date_end'], "%Y-%m-%d %H:%M:%S")
+                if shift.get('date_end') and shift['date_end'] != '0000-00-00 00:00:00':
+                    date_end_naive = datetime.strptime(shift['date_end'], "%Y-%m-%d %H:%M:%S")
+                    date_end = timezone.make_aware(date_end_naive, timezone.get_current_timezone())
             except Exception:
                 pass
 
@@ -143,18 +159,24 @@ def save_cash_shifts_range(api_client, start_date: str, end_date: str = None, sp
 
 
 
-def save_sales_from_august(api_client, spot_id=None):
+
+def save_sales_from_september(api_client, spot_id=None):
     """
     Запускает сохранение продаж по сменам
-    начиная с 1 августа 2025 года до сегодняшнего дня включительно.
+    начиная с 1 сентября 2025 года до сегодняшнего дня включительно.
     """
-    start_date = date(2025, 8, 1)
-    end_date = date.today()
+    start_date = date(2025, 10, 1)
+    end_date = date(2025, 10, 1)
 
     current_date = start_date
     while current_date <= end_date:
         date_str = current_date.strftime("%Y-%m-%d")
-        save_shift_sales_to_db(api_client, date_str, spot_id)
+        try:
+            save_shift_sales_to_db(api_client, date_str)
+            save_cash_shifts_range(api_client, date_str)
+            logger.info(f"✅ Data for {date_str} successfully saved to DB")
+        except Exception as e:
+            logger.error(f"❌ Error saving data for {date_str}: {e}")
         current_date += timedelta(days=1)
 
 
@@ -171,15 +193,22 @@ def save_products(products_data: list[dict]):
     validated_data = serializer.validated_data
 
     for item in validated_data:
-        category_obj, _ = Category.objects.get_or_create(
-            category_id=item["category_id"],
-            defaults={"name": item["category_name"]}
-        )
+        logger.info(f"[save_products] product_id={item.get('product_id')}, "
+            f"category_id={item.get('category_id')}, category_name={item.get('category_name')}")
+        
+        category_obj = None
+        if "category_id" in item and "category_name" in item:
+            category_obj, _ = Category.objects.get_or_create(
+                category_id=item["category_id"],
+                defaults={"category_name": item["category_name"]}
+            )
+        else:
+            logger.warning(f"[save_products] Product {item.get('product_id')} has no category!")
 
         product_obj, _ = Product.objects.get_or_create(
-            product_id=item["product_id"],
+            product_id=item.get("product_id"),
             defaults={
-                "product_name": item["product_name"],
+                "product_name": item.get("product_name"),
                 "category": category_obj,
                 "cost": item.get("cost", 0),
                 "fiscal": item.get("fiscal", True),
@@ -188,7 +217,7 @@ def save_products(products_data: list[dict]):
         )
 
         # Обновляем существующий продукт
-        product_obj.name = item["product_name"]
+        product_obj.product_name = item["product_name"]
         product_obj.cost = item.get("cost", 0)
         product_obj.fiscal = item.get("fiscal", True)
         product_obj.workshop = item.get("workshop", 0)
@@ -205,17 +234,22 @@ def save_products_sales(products_data: list[dict]):
     validated_data = serializer.validated_data
 
     for item in validated_data:
-        category_obj, _ = Category.objects.get_or_create(
-            category_id=item["category_id"],
-            defaults={"name": item["category_name"]}
-        )
+        logger.info(f"[save_products_sales] product_id={item.get('product_id')}, "
+                    f"category_id={item.get('category_id')}, category_name={item.get('category_name')}")
+        category_obj = None
+        if "category_id" in item and "category_name" in item:
+            category_obj, _ = Category.objects.get_or_create(
+                category_id=item["category_id"],
+                defaults={"name": item["category_name"]}
+            )
+        else:
+            logger.warning(f"[save_products_sales] Product {item.get('product_id')} has no category!")
 
         product_obj, _ = Product.objects.get_or_create(
-            product_id=item["product_id"],
+            product_id=item.get("product_id"),
             defaults={
-                "name": item["name"],
+                "product_name": item.get("name"),
                 "category": category_obj,
-                "category_name": item["category_name"],
                 "cost": item.get("price", 0),
                 "fiscal": True,
                 "workshop": 0
@@ -246,11 +280,11 @@ def save_categories(categories_data: list[dict]):
     for item in validated_data:
         category_obj, created = Category.objects.get_or_create(
             category_id=item["category_id"],
-            defaults={"name": item["name"]}
+            defaults={"category_name": item["category_name"]}
         )
 
-        if not created and category_obj.name != item["name"]:
-            category_obj.name = item["name"]
+        if not created and category_obj.category_name != item["category_name"]:
+            category_obj.category_name = item["category_name"]
             category_obj.save()
 
 
@@ -266,7 +300,7 @@ def save_categories_sales(categories_data: list[dict]):
     for item in validated_data:
         category_obj, _ = Category.objects.get_or_create(
             category_id=item["category_id"],
-            defaults={"name": item["name"]}
+            defaults={"category_name": item["category_name"]}
         )
 
         sales_obj, _ = CategoriesSales.objects.get_or_create(
@@ -382,7 +416,13 @@ def save_transaction_history(transaction_id: int, history_data: list[dict]) -> i
 
 # ------------------ Сохранение продуктов ------------------
 def save_transactions_products(products_data: list[dict]):
+    logger.info(f"[save_transactions_products] products_data sample: {products_data[:5]}")
     for item in products_data:
+        logger.info(f"[save_transactions_products] product_id={item.get('product_id')}, "
+                    f"category_id={item.get('category_id')}, category_name={item.get('category_name')}")
+
+        
+            
         try:
             tx_obj = Transactions.objects.get(transaction_id=item.get("transaction_id"))
         except Transactions.DoesNotExist:
@@ -402,13 +442,23 @@ def save_transactions_products(products_data: list[dict]):
                     "email": client_data.get("email", None),
                 }
             )
+            
+        category_obj = None
+        category_id = item.get("category_id")
+        if category_id is not None:
+            category_name = item.get("category_name") or f"Category {category_id}"
+            category_obj, _ = Category.objects.get_or_create(
+                category_id=category_id,
+                defaults={"category_name": category_name}
+            )
+        else:
+            logger.warning(f"Product {item.get('product_id')} has no category_id!")
 
         product_obj, _ = Product.objects.get_or_create(
             product_id=item.get("product_id"),
             defaults={
-                "name": item.get("product_name"),
-                "category_id": item.get("category_id", 0),
-                "category_name": item.get("category_name", ""),
+                "product_name": item.get("product_name"),
+                "category": category_obj,
                 "cost": float(item.get("product_cost", 0)),
                 "workshop": int(item.get("workshop", 0))
             }
@@ -572,7 +622,7 @@ def sync_all_from_date(api_client, start_date: str, spot_id: int = None):
     Синхронизирует все данные из Poster API с указанной даты до сегодняшнего дня.
     Всегда обновляет существующие записи или создает новые.
     """
-    start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
+    start_dt = datetime.strptime(str(start_date), "%Y-%m-%d").date()
     end_dt = date.today()
     current_date = start_dt
 
@@ -626,7 +676,7 @@ def sync_all_from_date(api_client, start_date: str, spot_id: int = None):
                 if clients_data:
                     save_clients(clients_data)
 
-            # Мастерские
+            # Цех
             if hasattr(api_client, "get_workshops"):
                 workshops_data = api_client.get_workshops()
                 if workshops_data:
@@ -639,7 +689,9 @@ def sync_all_from_date(api_client, start_date: str, spot_id: int = None):
                     save_payment_methods(payments_data)
 
         except Exception as e:
-            logger.error(f"Failed to sync {date_str}: {e}")
+            import traceback
+            logger.error(f"Failed to sync {date_str}: {e}, type={type(e)}")
+            traceback.print_exc()
 
         current_date += timedelta(days=1)
 

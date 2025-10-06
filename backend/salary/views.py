@@ -1,4 +1,6 @@
 # salary/views.py
+from collections import defaultdict
+from decimal import Decimal
 from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -9,10 +11,11 @@ from rest_framework.permissions import IsAuthenticated
 import logging
 
 
-from poster_api.models import Product
-from poster_api.client import PosterAPIClient
-from .models import SalaryRecord, SalaryRule, SalaryRuleProduct
-from .serializers import PosterEmployeeSerializer, SalaryRecordSerializer, SalaryRuleSerializer
+from salary.aggreg import aggregate_sales
+from shift.models import Shift
+from poster_api.models import Employee
+from .models import SalaryRecord, SalaryRule
+from .serializers import  SalaryRecordSerializer, SalaryRuleSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -69,15 +72,7 @@ class SalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 
-class PosterEmployeesViewSet(viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
 
-    def list(self, request):
-        client = PosterAPIClient()
-        employees = client.get_employees()
-
-        serializer = PosterEmployeeSerializer(employees, many=True)
-        return Response(serializer.data)
     
     
     
@@ -90,3 +85,86 @@ class SalaryRuleViewSet(viewsets.ModelViewSet):
         salary_rule = self.get_object()
         salary_rule.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    
+
+
+class SalaryAggregateViewSet(viewsets.ViewSet):
+    """
+    Агрегирует данные по сменам и рассчитывает зарплату по ролям/сотрудникам.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def format_employee_salary(self, employee_data):
+        """
+        Приводит данные одного сотрудника к удобному формату для фронта
+        """
+        emp = employee_data["employee"]
+        total = employee_data["total_salary"]
+
+        return {
+            "employee_id": emp.id,
+            "employee_name": emp.name,
+            "role_name": emp.role.name if hasattr(emp, "role") and emp.role else None,
+            "additional": float(total),
+        }
+
+    @action(detail=False, methods=["get"], url_path=r"shift/(?P<shift_id>\d+)")
+    def by_shift(self, request, shift_id=None):
+        """
+        Возвращает агрегированную зарплату по конкретной смене.
+        Пример: GET /api/salary/aggregate_sales/shift/12/
+        """
+        try:
+            shift = Shift.objects.get(id=shift_id)
+        except Shift.DoesNotExist:
+            return Response({"error": "Смена не найдена"}, status=404)
+
+        logger.info(f"Агрегация зарплаты для смены ID={shift_id}")
+
+        result = aggregate_sales(shift)
+
+        formatted = [self.format_employee_salary(v) for v in result.values()]
+        total = sum(v["additional"] for v in formatted)
+
+        return Response({
+            "shift_id": shift.id,
+            "date": shift.date if hasattr(shift, "date") else None,
+            "employees": formatted,
+            "total_shift_payout": total
+        })
+
+    @action(detail=False, methods=["get"], url_path=r"month/(?P<year>\d{4})/(?P<month>\d{1,2})")
+    def by_month(self, request, year=None, month=None):
+        """
+        Возвращает сумму выплат по всем сменам за месяц.
+        """
+        shifts = Shift.objects.filter(date__year=year, date__month=month)
+        if not shifts.exists():
+            return Response({"error": "Смены за указанный месяц не найдены"}, status=404)
+
+        logger.info(f"Агрегация зарплаты за {month}.{year}")
+
+        total_result = defaultdict(Decimal)
+        for shift in shifts:
+            result = aggregate_sales(shift)
+            for emp_id, data in result.items():
+                total_result[emp_id] += data["total_salary"]
+
+        employees = Employee.objects.filter(id__in=total_result.keys())
+
+        formatted = [
+            {
+                "employee_id": emp.id,
+                "employee_name": emp.name,
+                "total_month_salary": float(total_result[emp.id])
+            }
+            for emp in employees
+        ]
+
+        return Response({
+            "year": int(year),
+            "month": int(month),
+            "employees": formatted,
+            "total": sum(e["total_month_salary"] for e in formatted)
+        })

@@ -1,6 +1,5 @@
 import asyncio
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 import json
 from typing import Optional, List
@@ -225,9 +224,6 @@ class PosterAPIClient:
 
 
 
-    
-    
-    
     def get_transactions(
             self,
             date_from: str,
@@ -308,7 +304,7 @@ class PosterAPIClient:
         return await asyncio.gather(*tasks)
 
     # ------------------ Shift Sales ------------------
-    def get_sales_by_shift_with_delivery(self, date: str, spot_id: int = None) -> dict:
+    def get_sales_by_shift_with_delivery(self, date: str, spot_id: int = 1) -> dict:
         date_from_dt = datetime.strptime(date, "%Y-%m-%d")
         date_to_dt = date_from_dt + timedelta(days=1)
         date_to_dt_limit = date_to_dt.replace(hour=6, minute=0, second=0)
@@ -443,43 +439,37 @@ class PosterAPIClient:
                         tx_payment_id_int = None
                     product['delivery_service'] = service_map.get(tx_payment_id_int, "Другое")
 
-                assigned = False
+                target_shift = None
                 for shift in shifts:
                     if shift['start_dt'] <= product_time <= shift['end_dt']:
-                        key = f"{product['product_id']}_{product['delivery_service']}" if category == 'delivery' else product['product_id']
-                        res = result[shift['id']][category][key]
-                        if res['product_id'] is None:
-                            res['product_id'] = product['product_id']
-                            res['product_name'] = product['product_name']
-                            res['workshop'] = product.get('workshop')
-                            if category == "delivery":
-                                res['delivery_service'] = product['delivery_service']
-
-                        res['count'] += float(product['num'])
-                        res['product_sum'] += float(product.get('product_sum', 0))
-                        res['payed_sum'] += round(float(product.get('payed_sum', 0)), 2)
-                        res['profit'] += round(float(product.get('product_profit', 0)) / 100, 2)
-                        assigned = True
+                        target_shift = shift
                         break
 
-                if not assigned and shifts:
+                if not target_shift and shifts:
                     first_shift = shifts[0]
-                    first_shift_start = first_shift['start_dt']
-                    early_morning_start = first_shift_start.replace(hour=9, minute=0, second=0)
-                    if early_morning_start <= product_time < first_shift_start:
-                        key = f"{product['product_id']}_{product['delivery_service']}" if category == 'delivery' else product['product_id']
-                        res = result[first_shift['id']][category][key]
-                        if res['product_id'] is None:
-                            res['product_id'] = product['product_id']
-                            res['product_name'] = product['product_name']
-                            res['workshop'] = product.get('workshop')
-                            if category == "delivery":
-                                res['delivery_service'] = product['delivery_service']
+                    early_morning_start = first_shift['start_dt'].replace(hour=9, minute=0, second=0)
+                    if early_morning_start <= product_time < first_shift['start_dt']:
+                        target_shift = first_shift
 
-                        res['count'] += float(product['num'])
-                        res['product_sum'] += float(product.get('product_sum', 0))
-                        res['payed_sum'] += round(float(product.get('payed_sum', 0)), 2)
-                        res['profit'] += round(float(product.get('product_profit', 0)) / 100, 2)
+                if target_shift:
+                    key = (
+                        f"{product['product_id']}_{product['delivery_service']}"
+                        if category == 'delivery'
+                        else product['product_id']
+                    )
+                    res = result[target_shift['id']][category][key]
+
+                    if res['product_id'] is None:
+                        res['product_id'] = product['product_id']
+                        res['product_name'] = product['product_name']
+                        res['workshop'] = product.get('workshop')
+                        if category == "delivery":
+                            res['delivery_service'] = product['delivery_service']
+
+                    res['count'] += float(product['num'])
+                    res['product_sum'] += float(product.get('product_sum', 0))
+                    res['payed_sum'] += round(float(product.get('payed_sum', 0)), 2)
+                    res['profit'] += round(float(product.get('product_profit', 0)) / 100, 2)
 
             except Exception as e:
                 logger.error(f"Error processing product {product}: {e}")
@@ -592,7 +582,3 @@ class PosterAPIClient:
             }
             for el in data
         ]
-        
-        
-        
-        

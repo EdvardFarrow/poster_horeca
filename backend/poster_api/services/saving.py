@@ -1,12 +1,9 @@
-import asyncio
+
 from decimal import Decimal
-from asgiref.sync import sync_to_async
 from datetime import date, datetime, timedelta
 from django.utils import timezone
 import json
 import logging
-from django.utils.timezone import make_aware
-from django.utils.dateparse import parse_datetime
 
 
 from ..serializers import (
@@ -32,9 +29,7 @@ from ..models import (
     Workshop, 
     Transactions
     )
-from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from rest_framework.exceptions import ValidationError
+
 
 
 logging.basicConfig(level=logging.INFO)

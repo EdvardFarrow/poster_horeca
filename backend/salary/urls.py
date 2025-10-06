@@ -1,18 +1,13 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import PosterEmployeesViewSet, SalaryRuleViewSet, SalaryRecordViewSet
+from .views import SalaryRuleViewSet, SalaryRecordViewSet, SalaryAggregateViewSet
 
-rules_router = DefaultRouter()
-rules_router.register(r'salary_rules', SalaryRuleViewSet, basename='salary_rules')
+router = DefaultRouter()
+router.register(r'salary_rules', SalaryRuleViewSet, basename='salary_rules')
+router.register(r'salary_records', SalaryRecordViewSet, basename='salary_records')
+router.register(r'aggregate_sales', SalaryAggregateViewSet, basename='aggregate_sales')
 
-records_router = DefaultRouter()
-records_router.register(r'salary_records', SalaryRecordViewSet, basename='salary_records')
-
-employees_router = DefaultRouter()
-employees_router.register(r'employees', PosterEmployeesViewSet, basename='poster-employee')
 
 urlpatterns = [
-    path('', include(rules_router.urls)),
-    path('', include(records_router.urls)),
-    path('', include(employees_router.urls)),
+    path('', include(router.urls)),
 ]

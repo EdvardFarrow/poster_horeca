@@ -7,11 +7,11 @@ from .views import (
     ShiftSalesView,
     TransactionsHistoryViewSet,
     WorkshopViewSet,
-    SaveShiftSalesView
+    SaveShiftSalesView,
+    SpotViewSet
 )
 
 router = DefaultRouter()
-#router.register(r'statistics', StatisticsView, basename='statistics')
 router.register(r'cash_shifts', CashShiftViewSet, basename='cashshift')
 router.register(r'shift_sales', ShiftSalesView, basename='shift_sales')
 router.register(r'transactions_history', TransactionsHistoryViewSet, basename='transactions_history')
@@ -19,6 +19,8 @@ router.register(r'payment-methods', PaymentMethodsView, basename='payment-method
 router.register(r'poster_api_workshop', WorkshopViewSet, basename='workshop')
 router.register(r'poster_api_product', ProductViewSet, basename='product')
 router.register(r'shift_sales_item', SaveShiftSalesView, basename='shift_sales_item')
+router.register(r'spot', SpotViewSet, basename='spot')
+
 
 urlpatterns = [
     path('', include(router.urls)),

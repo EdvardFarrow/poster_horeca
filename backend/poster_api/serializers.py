@@ -1,4 +1,3 @@
-from decimal import Decimal
 from rest_framework import serializers
 from .models import (
     CategoriesSales, 
@@ -24,7 +23,7 @@ class CategoryModelSerializer(serializers.ModelSerializer):
 
 class ProductModelSerializer(serializers.ModelSerializer):
     category_id = serializers.PrimaryKeyRelatedField(
-        source='category',  # связывает с полем categor
+        source='category', 
         queryset=Category.objects.all()
     )
     class Meta:
@@ -82,11 +81,11 @@ class ProductSalesAPISerializer(serializers.Serializer):
 
 class CategoryAPISerializer(serializers.Serializer):
     category_id = serializers.IntegerField()
-    name = serializers.CharField()
+    category_name = serializers.CharField()
 
 class CategoriesSalesAPISerializer(serializers.Serializer):
     category_id = serializers.IntegerField()
-    name = serializers.CharField()
+    category_name = serializers.CharField()
     count = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
     profit = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
 
@@ -134,15 +133,9 @@ class ClientSerializer(serializers.ModelSerializer):
         ]
 
 
-
-
-
-
 class EmployeeSerializer(serializers.Serializer):
     employee_id = serializers.IntegerField(source="id")
     employee_name = serializers.CharField(source="name")
-
-
 
 
 class CashShiftSerializer(serializers.Serializer):
@@ -159,22 +152,6 @@ class CashShiftSerializer(serializers.Serializer):
     user_id_start = serializers.CharField(allow_null=True, allow_blank=True)
     user_id_end = serializers.CharField(allow_null=True, allow_blank=True)
     comment = serializers.CharField(allow_null=True, allow_blank=True)
-
-
-
-
-# class TransactionHistorySerializer(serializers.Serializer):
-#     transaction_id = serializers.CharField()
-#     type_history = serializers.CharField()
-#     time = serializers.CharField()
-#     value = serializers.CharField(allow_null=True)
-#     value2 = serializers.CharField(allow_null=True)
-#     value3 = serializers.CharField(allow_null=True)
-#     value_text = serializers.CharField(allow_null=True)
-#     spot_tablet_id = serializers.CharField(allow_null=True)
-
-
-
 
 
 class ShiftSaleItemSerializer(serializers.ModelSerializer):
@@ -199,10 +176,8 @@ class ShiftSalesSerializer(serializers.Serializer):
     difference = serializers.DecimalField(max_digits=12, decimal_places=2)
     tips = serializers.DecimalField(max_digits=12, decimal_places=2)
     tips_by_service = serializers.DictField(child=serializers.DecimalField(max_digits=12, decimal_places=2))
-    
-    
-    
-    
+
+
 class WorkshopForFrontendSerializer(serializers.Serializer):
     id = serializers.IntegerField(source='workshop_id')
     name = serializers.CharField(source='workshop_name')
@@ -211,3 +186,9 @@ class ProductForFrontendSerializer(serializers.Serializer):
     id = serializers.IntegerField(source='product_id')
     name = serializers.CharField(source='product_name')
     workshop_id = serializers.IntegerField(source='workshop') 
+
+
+class SpotSerializer(serializers.Serializer):
+    spot_id = serializers.IntegerField()
+    spot_name = serializers.CharField(default="")
+    spot_address = serializers.CharField(default="")    

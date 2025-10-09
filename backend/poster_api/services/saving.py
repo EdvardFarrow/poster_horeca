@@ -1,9 +1,11 @@
-
 from decimal import Decimal
 from datetime import date, datetime, timedelta
 from django.utils import timezone
 import json
 import logging
+
+from poster_api.client import PosterAPIClient
+from users.models import Role
 
 
 from ..serializers import (
@@ -31,6 +33,8 @@ from ..models import (
     )
 
 
+
+api_client = PosterAPIClient()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -154,14 +158,13 @@ def save_cash_shifts_range(api_client, start_date: str, spot_id: int = None, end
 
 
 
-
 def save_sales_from_september(api_client, spot_id=None):
     """
     Запускает сохранение продаж по сменам
     начиная с 1 сентября 2025 года до сегодняшнего дня включительно.
     """
     start_date = date(2025, 10, 1)
-    end_date = date(2025, 10, 1)
+    end_date = date(2025, 10, 6) 
 
     current_date = start_date
     while current_date <= end_date:
@@ -173,9 +176,6 @@ def save_sales_from_september(api_client, spot_id=None):
         except Exception as e:
             logger.error(f"❌ Error saving data for {date_str}: {e}")
         current_date += timedelta(days=1)
-
-
-
 
 
 
@@ -310,7 +310,6 @@ def save_categories_sales(categories_data: list[dict]):
         sales_obj.save()
 
 
-
 def parse_poster_datetime(value):
     """
     Парсит время из постера.
@@ -416,8 +415,6 @@ def save_transactions_products(products_data: list[dict]):
         logger.info(f"[save_transactions_products] product_id={item.get('product_id')}, "
                     f"category_id={item.get('category_id')}, category_name={item.get('category_name')}")
 
-        
-            
         try:
             tx_obj = Transactions.objects.get(transaction_id=item.get("transaction_id"))
         except Transactions.DoesNotExist:
@@ -480,10 +477,10 @@ def delete_old_transactions():
     TransactionsProducts.objects.filter(transaction_id__in=old_tx_ids).delete()
     TransactionHistory.objects.filter(transaction_id__in=old_tx_ids).delete()
     Transactions.objects.filter(date_close__lt=one_month_ago).delete()
-    
-    
-        
-def save_workshops(workshops_data: list[dict]):
+
+
+
+def save_workshop(workshops_data: list[dict]):
     """
     Сохраняет список мастерских в таблицу Workshop через сериализатор.
     """
@@ -505,7 +502,7 @@ def save_workshops(workshops_data: list[dict]):
             workshop_obj.save()
 
 
-def save_payment_methods(payments_data: list[dict]):
+def save_payments_id(payments_data: list[dict]):
     """
     Сохраняет список методов оплаты в таблицу Payments_ID через сериализатор.
     """
@@ -557,61 +554,6 @@ def save_clients(clients_data: list[dict]) -> int:
     return saved_count
 
 
-
-
-
-
-
-def sync_poster_day(api_client, date_str: str, spot_id: int = None):
-    # 1. Получаем транзакции
-    transactions_data = api_client.get_transactions(date_from=date_str, date_to=date_str, spot_id=spot_id)
-    if not transactions_data:
-        logger.warning(f"No transactions found for {date_str}")
-        return
-
-    save_transactions(transactions_data)
-    transaction_ids = [tx["transaction_id"] for tx in transactions_data if "transaction_id" in tx]
-
-    if transaction_ids:
-        histories = []
-        for tx_id in transaction_ids:
-            response = api_client.make_request(
-                "GET",
-                "dash.getTransactionHistory",
-                params={"transaction_id": tx_id}
-            ).get("response", [])
-            histories.append((tx_id, response, None, None))  
-
-        for tx_id, history_actions, _, _ in histories:
-            save_transaction_history(int(tx_id), history_actions)
-
-        
-        products_data = api_client.get_transactions_products(transaction_ids)
-        save_transactions_products(products_data)
-
-    logger.info(f"Sync finished for {date_str}, transactions: {len(transaction_ids)}")
-
-
-# ------------------ Синхронный sync_poster_from_august ------------------
-def sync_poster_from_august(api_client, spot_id: int = None):
-    start_date = datetime(2025, 8, 1)
-    end_date = datetime.now()
-    current_date = start_date
-
-    while current_date <= end_date:
-        date_str = current_date.strftime("%Y-%m-%d")
-        try:
-            logger.info(f"Syncing Poster data for {date_str}")
-            sync_poster_day(api_client, date_str, spot_id)
-        except Exception as e:
-            logger.error(f"Failed to sync {date_str}: {e}")
-        current_date += timedelta(days=1)
-
-    logger.info("All Poster data synced from August 2025 to today.")
-    
-    
-    
-    
 def sync_all_from_date(api_client, start_date: str, spot_id: int = None):
     """
     Синхронизирует все данные из Poster API с указанной даты до сегодняшнего дня.
@@ -660,28 +602,28 @@ def sync_all_from_date(api_client, start_date: str, spot_id: int = None):
 
             # Категории
             if hasattr(api_client, "get_categories"):
-                categories_data = api_client.get_categories()
+                categories_data = api_client.get_category()
                 if categories_data:
                     save_categories(categories_data)
                     save_categories_sales(categories_data)
 
             # Клиенты
             if hasattr(api_client, "get_clients"):
-                clients_data = api_client.get_clients(date_from=date_str, date_to=date_str)
+                clients_data = api_client.get_clients_sales(date_from=date_str, date_to=date_str)
                 if clients_data:
                     save_clients(clients_data)
 
             # Цех
             if hasattr(api_client, "get_workshops"):
-                workshops_data = api_client.get_workshops()
+                workshops_data = api_client.get_workshop()
                 if workshops_data:
-                    save_workshops(workshops_data)
+                    save_workshop(workshops_data)
 
             # Методы оплаты
-            if hasattr(api_client, "get_payment_methods"):
-                payments_data = api_client.get_payment_methods()
+            if hasattr(api_client, "get_payments_id"):
+                payments_data = api_client.get_payments_id()
                 if payments_data:
-                    save_payment_methods(payments_data)
+                    save_payments_id(payments_data)
 
         except Exception as e:
             import traceback
@@ -691,3 +633,26 @@ def sync_all_from_date(api_client, start_date: str, spot_id: int = None):
         current_date += timedelta(days=1)
 
     logger.info(f"All Poster data synced from {start_date} to today.")
+
+
+
+
+def create_role_lists(api_client):
+    roles = [
+        'Официант',
+        'Бармен',
+        'Старший Бармен',
+        'Кальянный мастер',
+        'Старший Кальянный мастер',
+        'Менеджер',
+        'Управляющий',
+        'Уборщик',
+        'Повар',
+        'Шеф-Повар',
+        'SMM',
+        'Доставщик',
+        'Курьер',
+    ]
+    
+    for role in roles:
+        Role.objects.get_or_create(name=role)

@@ -1,37 +1,26 @@
-import asyncio
 from datetime import datetime as dt
-import json
-from typing import Optional
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.decorators import action
-from asgiref.sync import sync_to_async, async_to_sync
+from asgiref.sync import  async_to_sync
 from rest_framework.permissions import AllowAny
-from rest_framework.authentication import SessionAuthentication
 
-from .models import Product, ShiftSale, Workshop
+from .models import Product, ShiftSale, Spot, Workshop
 
 from .client import PosterAPIClient
 from .serializers import (
     CashShiftSerializer,
     PaymentMethodSerializer, 
-    ProductAPISerializer,
     ProductForFrontendSerializer,
     ShiftSaleItemSerializer, 
-    ShiftSalesSerializer, 
+    ShiftSalesSerializer,
+    SpotSerializer, 
     TransactionHistorySerializer,
     WorkshopForFrontendSerializer, 
-    WorkshopSerializer
+    
     )
 import logging
 
 logger = logging.getLogger(__name__)
-
-
-
-
-
-
 
 
 class CashShiftViewSet(viewsets.ViewSet):
@@ -50,8 +39,8 @@ class CashShiftViewSet(viewsets.ViewSet):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
-        
+
+
 class ShiftSalesView(viewsets.ViewSet):
     def list(self, request):
         date = request.query_params.get('date')
@@ -98,12 +87,9 @@ class ShiftSalesView(viewsets.ViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-
-
 class SaveShiftSalesView(viewsets.ViewSet):
     permission_classes = [AllowAny]
-    
-    
+
     def create(self, request):
         items = request.data.get("items", [])
         logger.info(f"Получено {len(items)} items: {items}")
@@ -124,12 +110,7 @@ class SaveShiftSalesView(viewsets.ViewSet):
         return Response({"created": created}, status=status.HTTP_201_CREATED)
 
 
-
-
-
-
 class TransactionsHistoryViewSet(viewsets.ViewSet):
-
     def list(self, request):
         return async_to_sync(self._async_list)(request)
 
@@ -157,22 +138,24 @@ class TransactionsHistoryViewSet(viewsets.ViewSet):
             return Response({"error": "Failed to fetch transactions"}, status=500)
 
 
-
-
-
 class PaymentMethodsView(viewsets.ViewSet):
     def list(self, request, *args, **kwargs):
         client = PosterAPIClient()
         payments_data = client.get_payments_id()
         serializer = PaymentMethodSerializer(payments_data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
-    
+
 
 class WorkshopViewSet(viewsets.ModelViewSet):
     queryset = Workshop.objects.all()
     serializer_class = WorkshopForFrontendSerializer
 
+
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductForFrontendSerializer
+
+
+class SpotViewSet(viewsets.ModelViewSet):
+    queryset = Spot.objects.all()
+    serializer_class = SpotSerializer

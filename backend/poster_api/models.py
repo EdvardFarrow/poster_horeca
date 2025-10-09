@@ -5,22 +5,17 @@ class Employee(models.Model):
     name = models.CharField(max_length=255)
 
 
-
-
 class Category(models.Model):
     category_id = models.IntegerField(unique=True)
     category_name = models.CharField(max_length=255, null=True)
 
-    def __str__(self):
-        return self.category_name
-    
 
 class CategoriesSales(models.Model):
     category = models.ForeignKey(Category, on_delete=models.SET_DEFAULT, default=1)    
     profit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     count = models.IntegerField(default=0)    
 
-                
+
 class Product(models.Model):
     product_id = models.IntegerField(unique=True)
     product_name = models.CharField(max_length=255)
@@ -28,8 +23,6 @@ class Product(models.Model):
     cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     fiscal = models.IntegerField(default=1)
     workshop = models.IntegerField(default=0)
-    
-
 
 
 class ProductSales(models.Model):
@@ -47,7 +40,7 @@ class Workshop(models.Model):
 class Payments_ID(models.Model):
     payment_method_id = models.IntegerField(unique=True)
     title = models.CharField(max_length=225)
-    
+
 
 class Clients(models.Model):
     client_id = models.IntegerField(default=1)
@@ -60,8 +53,8 @@ class Clients(models.Model):
     profit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     transactions = models.IntegerField(default=0)
     avg_check = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    
-    
+
+
 class Transactions(models.Model):
     transaction_id = models.IntegerField(null=True, blank=True)
     date_start = models.DateTimeField()
@@ -80,8 +73,8 @@ class Transactions(models.Model):
     client_id = models.CharField(default="", null=True, blank=True)
     service_mode = models.IntegerField(default=0)
     processing_status = models.IntegerField(default=0)
-    
-    
+
+
 class TransactionsProducts(models.Model):
     transaction = models.ForeignKey(Transactions, on_delete=models.CASCADE, related_name="products")
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="transaction_entries")
@@ -91,8 +84,8 @@ class TransactionsProducts(models.Model):
     client = models.ForeignKey(Clients, on_delete=models.CASCADE, related_name="transaction_entries", null=True, blank=True)
     product_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     product_profit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    
-    
+
+
 class TransactionHistory(models.Model):
     transaction = models.ForeignKey(Transactions, on_delete=models.CASCADE, related_name="history")
     type_history = models.CharField(max_length=50)
@@ -102,7 +95,6 @@ class TransactionHistory(models.Model):
     value3 = models.CharField(default="")
     value_text = models.JSONField(null=True, blank=True)
     spot_tablet_id = models.IntegerField(null=True, blank=True)
-
 
 
 class AnalyticsRecord(models.Model):
@@ -120,8 +112,6 @@ class AnalyticsRecord(models.Model):
     entity_id = models.IntegerField(null=True, blank=True)
     date = models.DateField()
     data = models.JSONField()  
-
-
 
 
 class CashShiftReport(models.Model):
@@ -160,10 +150,8 @@ class ShiftSale(models.Model):
     total_delivery_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0.0)
     
     tips = models.DecimalField(max_digits=12, decimal_places=2, default=0.0)
-    
-    
-    
-    
+
+
 class ShiftSaleItem(models.Model):
     shift_sale = models.ForeignKey(ShiftSale, related_name="items", on_delete=models.CASCADE)
 
@@ -176,4 +164,9 @@ class ShiftSaleItem(models.Model):
     category_name = models.CharField(max_length=255, blank=True, null=True)
     delivery_service = models.CharField(max_length=255, blank=True, null=True)
     tips = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    
+
+
+class Spot(models.Model):
+    spot_id = models.IntegerField()
+    spot_name = models.CharField(max_length=255, blank=True, null=True, default="") 
+    spot_address = models.CharField(max_length=255, blank=True, null=True, default="")   

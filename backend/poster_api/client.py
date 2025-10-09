@@ -30,6 +30,8 @@ class PosterAPIClient:
         date_only = date_str.split("T")[0]
         return datetime.strptime(date_only, "%Y-%m-%d").strftime("%Y%m%d")
 
+
+    # --- Request ---
     def make_request(self, method: str, endpoint: str, params: Optional[dict] = None) -> dict:
         try:
             url = f"{self.api_url}{endpoint}"
@@ -55,8 +57,6 @@ class PosterAPIClient:
         except Exception as e:
             logger.error(f"API Error: {e}")
             return {"error": str(e)}
-        
-
 
 
     # ------------------ Clients ------------------
@@ -96,7 +96,6 @@ class PosterAPIClient:
         return normalized
 
 
-
     # ------------------ Products ------------------
     def get_products(self, spot_id: int = None) -> list[dict]:
         params = {}
@@ -116,7 +115,6 @@ class PosterAPIClient:
                 "workshop": int(item.get("workshop", 0))
             })
         return normalized
-
 
 
     # ------------------ Products Sales------------------
@@ -148,6 +146,7 @@ class PosterAPIClient:
             })
         return normalized
     
+    
     #--------------Category------------
     def get_category(self, spot_id: int = None) -> list[dict]:
         params = {}
@@ -159,7 +158,7 @@ class PosterAPIClient:
         return [
             {
                 "category_id": el.get("category_id"),
-                "name": el.get("category_name"),
+                "category_name": el.get("category_name"),
             }
             for el in data
         ]
@@ -210,6 +209,8 @@ class PosterAPIClient:
             "comment": shift.get("comment"),
         }
 
+
+    # --- CASH Shifts ---
     def get_cash_shifts(self, date_from: str = None, date_to: str = None, spot_id: int = None) -> list[dict]:
         params = {}
         if date_from:
@@ -223,7 +224,7 @@ class PosterAPIClient:
         return [self._normalize_shift(shift) for shift in response] if response else []
 
 
-
+    # --- Transactions ---
     def get_transactions(
             self,
             date_from: str,
@@ -246,6 +247,8 @@ class PosterAPIClient:
         data = self.make_request("GET", "dash.getTransactions", params=params).get("response", [])
         return data
 
+
+    # --- Transactions Products ---
     def get_transactions_products(self, transaction_ids: list[int] = None) -> list[dict]:
         params = {}
         if transaction_ids:
@@ -267,7 +270,6 @@ class PosterAPIClient:
 
                 payment_method_id = None
                 tip_sum = 0.0 
-                
                 
                 for action in actions:
                     if action.get("type_history") == "close" and action.get("value_text"):
@@ -291,7 +293,6 @@ class PosterAPIClient:
                             logger.warning(f"Failed to parse value_text for {tx_id}: {e}")
 
                 return tx_id, actions, payment_method_id, tip_sum
-
 
             except Exception as e:
                 logger.warning(f"Failed to fetch history for {tx_id}: {e}")
@@ -509,8 +510,6 @@ class PosterAPIClient:
 
             result[sid]['tips'] = round(sum(entry.get('tips', 0.0) for entry in result[sid]['delivery'].values()), 2)
 
-        
-        
         # Формируем финальный результат
         final_result = {}
         for shift_id, sales in result.items():
@@ -528,13 +527,12 @@ class PosterAPIClient:
                 'tips': sales['tips'],
                 'tips_by_service': tips_by_service
             }
-            
 
         return final_result
 
 
 
-
+    # --- Payments id ---
     def get_payments_id(self) -> list[dict]:
         data = self.make_request("GET", "settings.getPaymentMethods").get("response", [])
 
@@ -547,6 +545,7 @@ class PosterAPIClient:
         ]
 
 
+    # --- Transactions for day ---
     def get_full_transactions_for_day(self, date_from: str, date_to: str, spot_id: int = None) -> list[dict]:
 
         transactions = self.get_transactions(date_from=date_from, date_to=date_to, spot_id=spot_id)
@@ -570,7 +569,7 @@ class PosterAPIClient:
         return all_close_history
 
 
-
+    # --- Workshops ---
     def get_workshop(self) -> list[dict]:
         data = self.make_request("GET", "menu.getWorkshops").get("response", [])
 
@@ -579,6 +578,20 @@ class PosterAPIClient:
                 "workshop_id": el.get("workshop_id"),
                 "workshop_name": el.get("workshop_name"),
                 "delete": el.get("delete")
+            }
+            for el in data
+        ]
+
+
+    # --- Spots ---
+    def get_spots(self) -> list[dict]:
+        data = self.make_request('GET', 'spots.getSpots').get('response', [])
+        
+        return [
+            {
+                'spot_id': el.get('spot_id'),
+                'spot_name': el.get('name'),
+                'spot_address': el.get('address'),
             }
             for el in data
         ]

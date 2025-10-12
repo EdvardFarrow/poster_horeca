@@ -74,14 +74,16 @@ class SalaryRuleSerializer(serializers.ModelSerializer):
 
         return instance
 
-    
-
-
 
 
 class SalaryRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = SalaryRecord
-        fields = '__all__'
+        fields = [
+            'total_salary', 
+            'fixed_part', 
+            'percent_part', 
+            'bonus_part'
+        ]
 
 

@@ -1,4 +1,3 @@
-# salary/views.py
 from collections import defaultdict
 from decimal import Decimal
 from django.utils import timezone
@@ -11,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 import logging
 
 
+from .services import calculate_and_save_shift_salaries
 from salary.aggreg import aggregate_sales
 from shift.models import Shift
 from poster_api.models import Employee
@@ -21,61 +21,41 @@ logger = logging.getLogger(__name__)
 
 
 class SalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [IsAuthenticated]
+    
     queryset = SalaryRecord.objects.all()
     serializer_class = SalaryRecordSerializer
-    permission_classes = [IsAuthenticated]
 
-    def format_record(self, record):
-        shift = record.shift
-        return {
-            "date": shift.date,
-            "weekday": day_name[shift.date.weekday()],
-            "fixed_rate": getattr(record, "fixed_income", 0),
-            "percent_income": getattr(record, "percent_income", 0),
-            "total_income": record.amount,
-        }
+    def list(self, request, *args, **kwargs):
+        try:
+            year = int(request.query_params.get('year'))
+            month = int(request.query_params.get('month'))
+        except (TypeError, ValueError):
+            return Response({"error": "Year and month must be provided."}, status=400)
 
-    @action(detail=False, methods=["get"])
-    def current(self, request):
-        user = request.user
-        today = timezone.now().date()
-        records = SalaryRecord.objects.filter(
-            employee=user,
-            shift__date__year=today.year,
-            shift__date__month=today.month
-        )
-        formatted = [self.format_record(r) for r in records]
-        total = sum(r.amount for r in records)
-        return Response({
-            "month": today.month,
-            "year": today.year,
-            "shifts": formatted,
-            "total_income": total
-        })
-
-    @action(detail=False, methods=["get"], url_path="archive/(?P<year>\\d+)/(?P<month>\\d+)")
-    def archive(self, request, year=None, month=None):
-        user = request.user
-        records = SalaryRecord.objects.filter(
-            employee=user,
+        queryset = self.get_queryset().filter(
             shift__date__year=year,
             shift__date__month=month
-        )
-        formatted = [self.format_record(r) for r in records]
-        total = sum(r.amount for r in records)
-        return Response({
-            "month": int(month),
-            "year": int(year),
-            "shifts": formatted,
-            "total_income": total
-        })
+        ).select_related('employee', 'shift')
+
+        salaries_by_employee = defaultdict(dict)
+        for calc in queryset:
+            day_of_month = calc.shift.date.day
+            emp_id = calc.employee_id
+            
+            salaries_by_employee[emp_id][day_of_month] = {
+                "total_salary": calc.total_salary,
+                "details": {
+                    "fixed": calc.fixed_part,
+                    "percent": calc.percent_part,
+                    "bonus": calc.bonus_part,
+                }
+            }
+        
+        return Response(salaries_by_employee)
 
 
 
-
-    
-    
-    
 class SalaryRuleViewSet(viewsets.ModelViewSet):
     queryset = SalaryRule.objects.all()
     serializer_class = SalaryRuleSerializer
@@ -168,3 +148,21 @@ class SalaryAggregateViewSet(viewsets.ViewSet):
             "employees": formatted,
             "total": sum(e["total_month_salary"] for e in formatted)
         })
+        
+        
+        
+        
+class SaveShiftSalaryViewSet(viewsets.ViewSet):
+    queryset = Shift.objects.all()
+    permission_classes = [IsAuthenticated] 
+
+    @action(detail=True, methods=['post'], url_path='recalculate_salary')
+    def recalculate_salary(self, request, pk=None):
+        shift = self.get_object()
+        
+        calculate_and_save_shift_salaries(shift)
+        
+        return Response(
+            {"status": "success", "message": f"Salary for shift {shift.id} recalculated."},
+            status=status.HTTP_200_OK
+        )        

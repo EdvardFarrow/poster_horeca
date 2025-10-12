@@ -1,9 +1,8 @@
 from django.db import models
 from django.conf import settings
-from poster_api.models import CashShiftReport, Product
+from poster_api.models import Product, Workshop
 from users.models import Employee, Role
-from poster_api.models import Workshop
-
+from shift.models import Shift
 
 
 class SalaryRule(models.Model):
@@ -24,12 +23,21 @@ class SalaryRuleProduct(models.Model):
 
 
 class SalaryRecord(models.Model):
-    shift = models.ForeignKey(CashShiftReport, on_delete=models.CASCADE)
+    shift = models.ForeignKey(Shift, on_delete=models.CASCADE)
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
-    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_salary = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    fixed_part = models.DecimalField(max_digits=10, decimal_places=2, default=0,)
+    percent_part = models.DecimalField(max_digits=10, decimal_places=2, default=0,)
+    bonus_part = models.DecimalField(max_digits=10, decimal_places=2, default=0,)
+
+    created_at = models.DateTimeField(auto_now_add=True,)
+    updated_at = models.DateTimeField(auto_now=True,)
 
     class Meta:
         unique_together = ('shift', 'employee')
+        
+    def __str__(self):
+        return f"ЗП {self.employee.name} за смену {self.shift.date}: {self.total_salary}"    
         
         
         

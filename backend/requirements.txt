@@ -1,7 +1,10 @@
 asgiref==3.9.1
+asynctest==0.7.1
 certifi==2025.8.3
 charset-normalizer==3.4.3
+coverage==7.10.7
 Django==5.2.5
+django-async-test==0.2.2
 django-cors-headers==4.7.0
 django-extensions==4.1
 django-filter==25.1

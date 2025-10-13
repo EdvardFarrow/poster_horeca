@@ -1,0 +1,12 @@
+[run]
+source = poster_api, salary, shift, users
+omit =
+    */migrations/*
+    */tests
+    *__init__.py
+    */admin.py
+    */apps.py
+
+[report]
+show_missing = true
+fail_under = 80

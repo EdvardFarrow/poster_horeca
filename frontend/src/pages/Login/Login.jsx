@@ -25,7 +25,7 @@ export default function Login() {
                     navigate('/manager')
                     break
                 case 'owner':
-                    navigate('/owner') 
+                    navigate('/ownerdashboard') 
                     break
                 default:
                     navigate('/employee')

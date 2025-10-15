@@ -7,7 +7,6 @@ from .views import (
     ShiftSalesView,
     TransactionsHistoryViewSet,
     WorkshopViewSet,
-    SaveShiftSalesView,
     SpotViewSet
 )
 
@@ -18,7 +17,6 @@ router.register(r'transactions_history', TransactionsHistoryViewSet, basename='t
 router.register(r'payment-methods', PaymentMethodsView, basename='payment-methods')
 router.register(r'poster_api_workshop', WorkshopViewSet, basename='workshop')
 router.register(r'poster_api_product', ProductViewSet, basename='product')
-router.register(r'shift_sales_item', SaveShiftSalesView, basename='shift_sales_item')
 router.register(r'spot', SpotViewSet, basename='spot')
 
 

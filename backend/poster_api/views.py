@@ -43,71 +43,66 @@ class CashShiftViewSet(viewsets.ViewSet):
 
 class ShiftSalesView(viewsets.ViewSet):
     def list(self, request):
-        date = request.query_params.get('date')
-        if not date:
-            date = dt.today().strftime('%Y-%m-%d')
+        date_str = request.query_params.get('date') or dt.today().strftime('%Y-%m-%d')
+        
+        spot_ids = request.query_params.getlist('spot_id', ['1', '2'])
+        
+        client = PosterAPIClient()
+        total_poster_data = {}
 
-        spot_id = request.query_params.get('spot_id')
-        if spot_id:
+        for spot_id in spot_ids:
             try:
                 spot_id = int(spot_id)
-            except ValueError:
-                return Response(
-                    {"error": f"Неверный spot_id: {spot_id}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            except (ValueError, TypeError):
+                logger.warning(f"Неверный spot_id '{spot_id}' был пропущен.")
+                continue
 
-        client = PosterAPIClient()
+            try:
+                data_for_spot = client.get_sales_by_shift_with_delivery(date=date_str, spot_id=spot_id)
+                
+                for shift_id, sales in data_for_spot.items():
+                    if shift_id not in total_poster_data:
+                        total_poster_data[shift_id] = sales
+                    else:
+                        total_poster_data[shift_id]['regular'].extend(sales.get('regular', []))
+                        total_poster_data[shift_id]['delivery'].extend(sales.get('delivery', []))
 
-        try:
-            data = client.get_sales_by_shift_with_delivery(date=date, spot_id=spot_id)
-        except Exception as e:
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            except Exception as e:
+                logger.error(f"Ошибка при получении данных для спота {spot_id}: {e}", exc_info=True)
+                continue
 
-        if not data:
+        if not total_poster_data:
             return Response([], status=status.HTTP_200_OK)
 
+        poster_shift_ids = list(total_poster_data.keys())
+        
+        existing_shifts = ShiftSale.objects.filter(shift_id__in=poster_shift_ids)
+        
+        shifts_map = {shift.shift_id: shift for shift in existing_shifts}
+
         serialized_data = []
-        for shift_id, sales in data.items():
-            shift_obj = ShiftSale.objects.get(shift_id=shift_id)
+        date_obj = dt.strptime(date_str, '%Y-%m-%d').date()
+
+        for shift_id, sales in total_poster_data.items():
+            shift_obj = shifts_map.get(str(shift_id)) 
+
+            if not shift_obj:
+                shift_obj = ShiftSale.objects.create(shift_id=shift_id, date=date_obj)
+                logger.info(f"Создана новая запись в БД для смены с ID: {shift_id}")
+
             serialized_data.append({
-                'shift_id': shift_obj.id,
+                'shift_id': shift_obj.id, 
                 'regular': sales.get('regular', []),
                 'delivery': sales.get('delivery', []),
                 'difference': sales.get('difference', 0),
                 'tips': sales.get('tips', 0.0),
                 'tips_by_service': sales.get('tips_by_service', {})
-
             })
 
         serializer = ShiftSalesSerializer(serialized_data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class SaveShiftSalesView(viewsets.ViewSet):
-    permission_classes = [AllowAny]
-
-    def create(self, request):
-        items = request.data.get("items", [])
-        logger.info(f"Получено {len(items)} items: {items}")
-        
-        created = []
-        for idx, item in enumerate(items):
-            serializer = ShiftSaleItemSerializer(data=item)
-            if serializer.is_valid():
-                serializer.save()
-                created.append(serializer.data)
-            else:
-                logger.error(f"Ошибка сериализатора для item {idx}: {serializer.errors}")
-                return Response(
-                    {"error_index": idx, "errors": serializer.errors}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        logger.info(f"Успешно создано {len(created)} элементов")
-        return Response({"created": created}, status=status.HTTP_201_CREATED)
 
 
 class TransactionsHistoryViewSet(viewsets.ViewSet):

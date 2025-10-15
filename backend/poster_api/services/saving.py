@@ -4,11 +4,13 @@ from typing import Any, Dict, List, Optional, Set
 from django.utils import timezone
 from django.db import transaction
 
+
 import json
 import logging
 
 from poster_api.client import PosterAPIClient
 from users.models import Role
+from ..decorators import timing_decorator
 
 
 from ..serializers import (
@@ -43,6 +45,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+
+@timing_decorator
 def save_shift_sales_to_db(api_client, date_str: str, spot_id: int = None):
     """
     Saves sales by shift in bulk.
@@ -186,6 +190,8 @@ def _parse_and_make_aware(date_str: Optional[str]) -> Optional[datetime]:
         logger.warning(f"Could not parse datetime string: {date_str}")
         return None
 
+
+@timing_decorator
 def save_cash_shifts_range(api_client, start_date: str, spot_id: int = None, end_date: str = None):
     """
     Saves cash shifts from an API in bulk for a given date range.
@@ -272,7 +278,7 @@ def save_cash_shifts_range(api_client, start_date: str, spot_id: int = None, end
         logger.info(f"Cash shifts saved. Created: {len(shifts_to_create)}, Updated: {len(shifts_to_update)}.")
 
 
-
+@timing_decorator
 def save_products(products_data: list[dict]):
     """
     Bulk creates or updates products and their associated categories from a list of data.
@@ -355,6 +361,7 @@ def save_products(products_data: list[dict]):
 
 
 
+@timing_decorator
 def save_products_sales(products_data: list[dict]):
     """
     Bulk creates or updates product sales records from a list of data.
@@ -447,6 +454,7 @@ def save_products_sales(products_data: list[dict]):
             logger.info(f"[save_products_sales] Updated {len(sales_to_update)} existing sales records.")
 
 
+@timing_decorator
 def save_categories(categories_data: list[dict]):
     """
     Bulk creates new categories or updates existing ones from a list of data.
@@ -499,6 +507,7 @@ def save_categories(categories_data: list[dict]):
             logger.info(f"[save_categories] Updated {len(categories_to_update)} existing categories.")
 
 
+@timing_decorator
 def save_categories_sales(categories_data: list[dict]):
     """
     Bulk creates or updates category sales records from a list of data.
@@ -612,6 +621,8 @@ def parse_poster_datetime(value: Any) -> Optional[datetime]:
     return None
 
 
+
+@timing_decorator
 def save_transactions(data: List[Dict]) -> int:
     """
     Bulk saves new transaction records from a list of data.
@@ -675,6 +686,8 @@ def save_transactions(data: List[Dict]) -> int:
     return len(transactions_to_create)
 
 
+
+@timing_decorator
 def save_transaction_history(transaction_id: int, history_data: List[Dict]) -> int:
     """
     Bulk saves new history records for a specific transaction.
@@ -735,6 +748,7 @@ def save_transaction_history(transaction_id: int, history_data: List[Dict]) -> i
     return len(history_to_create)
 
 
+@timing_decorator
 def save_transactions_products(products_data: List[Dict]):
     """
     Bulk saves or updates product-transaction link records from a list of data.
@@ -851,6 +865,7 @@ def save_transactions_products(products_data: List[Dict]):
 
 
 
+@timing_decorator
 def save_workshop(workshops_data: List[Dict]):
     """
     Bulk creates or updates workshop records from a list of data.
@@ -907,6 +922,9 @@ def save_workshop(workshops_data: List[Dict]):
             Workshop.objects.bulk_update(workshops_to_update, ["workshop_name", "delete"])
             logger.info(f"[save_workshop] Updated {len(workshops_to_update)} existing workshops.")
 
+
+
+@timing_decorator
 def save_payments_id(payments_data: List[Dict]):
     """
     Bulk creates or updates payment method records from a list of data.
@@ -958,6 +976,9 @@ def save_payments_id(payments_data: List[Dict]):
             
 
 
+
+
+@timing_decorator
 def save_clients(clients_data: List[Dict]) -> int:
     """
     Bulk creates or updates client records from a list of data.
@@ -1021,6 +1042,7 @@ def save_clients(clients_data: List[Dict]) -> int:
     return len(clients_to_create)
 
 
+@timing_decorator
 def sync_all_from_date(api_client, start_date: str, spot_id: int = None):
     """
     Syncs all data from the Poster API for a given date range.

@@ -3,6 +3,8 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from asgiref.sync import  async_to_sync
 from rest_framework.permissions import AllowAny
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 
 from .models import Product, ShiftSale, Spot, Workshop
 
@@ -27,6 +29,8 @@ class CashShiftViewSet(viewsets.ViewSet):
     """
     Provides an endpoint to list cash shifts from the external Poster API.
     """
+    
+    @method_decorator(cache_page(60 * 15))
     def list(self, request):
         """
         Retrieves a list of cash shifts from the Poster API based on query parameters.
@@ -67,6 +71,8 @@ class ShiftSalesView(viewsets.ViewSet):
     the results with the local `ShiftSale` database model.
     It performs a 'get or create' operation for each shift.
     """
+
+    @method_decorator(cache_page(60 * 15))
     def list(self, request):
         """
         Retrieves and aggregates sales data for a given date across multiple spots.

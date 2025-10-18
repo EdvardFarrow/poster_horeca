@@ -21,10 +21,10 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
-class RegisterView(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = RegisterSerializer
-    permission_classes = []
+# class RegisterView(generics.CreateAPIView):
+#     queryset = User.objects.all()
+#     serializer_class = RegisterSerializer
+#     permission_classes = []
     
     
 class MeView(APIView):

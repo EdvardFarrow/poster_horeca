@@ -37,6 +37,6 @@ class ShiftEmployee(models.Model):
         return f"{self.employee.name} as {self.role.name} on {self.shift.date}"
 
     class Meta:
-        verbose_name = _("Shift-Employee Assignment")
-        verbose_name_plural = _("Shift-Employee Assignments")
+        verbose_name = ("Shift-Employee Assignment")
+        verbose_name_plural = ("Shift-Employee Assignments")
         unique_together = ('shift', 'employee', 'role')

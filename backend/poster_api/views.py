@@ -24,7 +24,24 @@ logger = logging.getLogger(__name__)
 
 
 class CashShiftViewSet(viewsets.ViewSet):
+    """
+    Provides an endpoint to list cash shifts from the external Poster API.
+    """
     def list(self, request):
+        """
+        Retrieves a list of cash shifts from the Poster API based on query parameters.
+
+        Args:
+            request: The DRF request object.
+
+        Query Params:
+            dateFrom (str): The start date (e.g., 'YYYY-MM-DD').
+            dateTo (str): The end date (e.g., 'YYYY-MM-DD').
+            spot_id (int, optional): The ID of the spot to filter by.
+
+        Returns:
+            Response: A list of serialized cash shift data or an error message.
+        """
         date_from = request.query_params.get("dateFrom")
         date_to = request.query_params.get("dateTo")
         spot_id = request.query_params.get("spot_id") 
@@ -42,7 +59,31 @@ class CashShiftViewSet(viewsets.ViewSet):
 
 
 class ShiftSalesView(viewsets.ViewSet):
+    """
+    Provides the main sales report endpoint.
+
+    This view fetches detailed sales data (regular and delivery) from the
+    Poster API, aggregates it across multiple spots, and then syncs
+    the results with the local `ShiftSale` database model.
+    It performs a 'get or create' operation for each shift.
+    """
     def list(self, request):
+        """
+        Retrieves and aggregates sales data for a given date across multiple spots.
+
+        It fetches data from the Poster API, then finds or creates a corresponding
+        `ShiftSale` record in the local database to get a local primary key.
+
+        Args:
+            request: The DRF request object.
+
+        Query Params:
+            date (str, optional): The target date in 'YYYY-MM-DD' format. Defaults to the current day.
+            spot_id (list[int], optional): A list of spot IDs to fetch. Can be provided multiple times (e.g., ?spot_id=1&spot_id=2). Defaults to ['1', '2'].
+
+        Returns:
+            Response: A list of serialized shift sales data, including local DB IDs and aggregated sales items.
+        """
         date_str = request.query_params.get('date') or dt.today().strftime('%Y-%m-%d')
         
         spot_ids = request.query_params.getlist('spot_id', ['1', '2'])
@@ -106,10 +147,38 @@ class ShiftSalesView(viewsets.ViewSet):
 
 
 class TransactionsHistoryViewSet(viewsets.ViewSet):
+    """
+    Provides an endpoint for fetching detailed transaction histories.
+    This viewset uses an asynchronous method to communicate with the Poster API.
+    """
     def list(self, request):
+        """
+        Synchronously wraps the asynchronous `_async_list` method.
+        This is the main entry point for the 'list' action.
+
+        Args:
+            request: The DRF request object.
+
+        Returns:
+            Response: The result of the async list call.
+        """
         return async_to_sync(self._async_list)(request)
 
     async def _async_list(self, request):
+        """
+        Asynchronously retrieves all transactions for a given date range.
+
+        Args:
+            request: The DRF request object.
+
+        Query Params:
+            date_from (str): The start date/time (e.g., 'YYYY-MM-DD'). Required.
+            date_to (str): The end date/time (e.g., 'YYYY-MM-DD'). Required.
+            spot_id (int, optional): The ID of the spot to filter by.
+
+        Returns:
+            Response: A list of serialized transaction data or an error message.
+        """
         date_from = request.query_params.get("date_from")
         date_to = request.query_params.get("date_to")
         spot_id = request.query_params.get("spot_id")

@@ -17,5 +17,5 @@ def calculate_and_save_shift_salaries(shift):
             }
         )
     
-    print(f"Зарплаты для смены {shift.id} от {shift.date} были рассчитаны и сохранены.")
+    print(f"Salaries for shift {shift.id} in {shift.date} calculated and saved.")
     return salary_results

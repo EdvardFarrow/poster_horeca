@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 
 class SalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Provides a read-only API endpoint for accessing historical, saved salary records.
+    
+    This ViewSet is used to retrieve salary data that has already been
+    calculated and saved to the `SalaryRecord` model.
+    """
     permission_classes = [IsAuthenticated]
     
     queryset = SalaryRecord.objects.all()
@@ -71,13 +77,13 @@ class SalaryRuleViewSet(viewsets.ModelViewSet):
 
 class SalaryAggregateViewSet(viewsets.ViewSet):
     """
-    Агрегирует данные по сменам и рассчитывает зарплату по ролям/сотрудникам.
+    Aggregates data by shift and calculates salaries by rollers/employees.
     """
     permission_classes = [IsAuthenticated]
 
     def format_employee_salary(self, employee_data):
         """
-        Приводит данные одного сотрудника к удобному формату для фронта
+        Brings data of one employee to a convenient format for the frontend
         """
         emp = employee_data["employee"]
         total = employee_data["total_salary"]
@@ -92,8 +98,8 @@ class SalaryAggregateViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"], url_path=r"shift/(?P<shift_id>\d+)")
     def by_shift(self, request, shift_id=None):
         """
-        Возвращает агрегированную зарплату по конкретной смене.
-        Пример: GET /api/salary/aggregate_sales/shift/12/
+        Returns the aggregated salary for a specific shift.
+        Example: GET /api/salary/aggregate_sales/shift/12/
         """
         try:
             shift = Shift.objects.get(id=shift_id)
@@ -117,7 +123,7 @@ class SalaryAggregateViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"], url_path=r"month/(?P<year>\d{4})/(?P<month>\d{1,2})")
     def by_month(self, request, year=None, month=None):
         """
-        Возвращает сумму выплат по всем сменам за месяц.
+        Returns the sum of payments for all shifts for the month.  
         """
         shifts = Shift.objects.filter(date__year=year, date__month=month)
         if not shifts.exists():
@@ -153,11 +159,32 @@ class SalaryAggregateViewSet(viewsets.ViewSet):
         
         
 class SaveShiftSalaryViewSet(viewsets.ViewSet):
+    """
+    A ViewSet to provide actions for triggering salary calculations
+    that are saved to the database.
+    
+    This is distinct from `SalaryAggregateViewSet`, which only performs
+    on-the-fly calculations for preview.
+    """
     queryset = Shift.objects.all()
     permission_classes = [IsAuthenticated] 
 
     @action(detail=True, methods=['post'], url_path='recalculate_salary')
     def recalculate_salary(self, request, pk=None):
+        """
+        Triggers the calculation and saving of salaries for a specific shift.
+
+        This action calls the `calculate_and_save_shift_salaries` service,
+        which runs the `aggregate_sales` logic and then updates or creates
+        `SalaryRecord` entries for each employee on that shift.
+
+        Args:
+            request: The DRF request object.
+            pk (int): The primary key of the `Shift` to recalculate.
+
+        Returns:
+            Response: A 200 response indicating success.
+        """
         shift = self.get_object()
         
         calculate_and_save_shift_salaries(shift)

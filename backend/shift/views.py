@@ -8,11 +8,41 @@ from users.models import Employee
 from datetime import datetime
 
 class ShiftViewSet(viewsets.ModelViewSet):
+    """
+    Manages work shifts (`Shift` model) and the assignment of
+    employees to those shifts (`ShiftEmployee`).
+    """
     queryset = Shift.objects.all().order_by("-date")
     serializer_class = ShiftSerializer
 
     @action(detail=False, methods=["post"], url_path="save_month")
     def save_month(self, request):
+        """
+        Batch creates or updates shifts for an entire month from a
+        list of shift objects.
+
+        This endpoint is designed to receive a full schedule (e.g., from a
+        frontend calendar) and synchronize the database. For each shift,
+        it finds or creates a `Shift` record. It then fully synchronizes
+        the `ShiftEmployee` assignments:
+        1. Adds new employees.
+        2. Updates existing ones (e.g., their role, if it changed).
+        3. *Deletes* any employees who were previously on the shift but are no longer in the provided list for that day.
+
+        Payload Example:
+        {
+            "shifts": [
+                {"date": "2025-10-01", "employees": [1, 2, 5]},
+                {"date": "2025-10-02", "employees": [1, 3]}
+            ]
+        }
+
+        Args:
+            request: The DRF request object containing the "shifts" payload.
+
+        Returns:
+            Response: A 201 status with a summary of created and updated shifts.
+        """
         data = request.data.get("shifts", [])
         created_count = 0
         updated_count = 0
@@ -67,6 +97,23 @@ class ShiftViewSet(viewsets.ModelViewSet):
         )
 
     def list(self, request, *args, **kwargs):
+        """
+        Overrides the default `list` action to return a simplified list
+        of shifts for a specified month and year.
+
+        This endpoint is optimized for populating a frontend calendar/schedule.
+
+        Query Params:
+            month (int): The target month (e.g., 10 for October). Required.
+            year (int): The target year (e.g., 2025). Required.
+
+        Returns:
+            Response: A list of shift objects in a simple format:
+            [
+                {"date": "2025-10-01", "employees": [1, 2, 5]},
+                {"date": "2025-10-02", "employees": [1, 3]}
+            ]
+        """
         month = int(request.query_params.get("month"))
         year = int(request.query_params.get("year"))
 

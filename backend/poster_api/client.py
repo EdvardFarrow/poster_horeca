@@ -9,7 +9,7 @@ import logging
 from .decorators import timing_decorator
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)  # Можно поставить INFO, если слишком много данных
+logger.setLevel(logging.DEBUG)  
 if not logger.hasHandlers():
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
@@ -18,8 +18,13 @@ if not logger.hasHandlers():
     
 REGULAR_PAYMENT_IDS = {0, 1, 2, 3, 4, 5}
 SERVICE_MAP = {
-    7: "Uber Eats", 8: "Wolt", 9: "Just Eat", 10: "Glovo CASH",
-    11: "Wolt", 12: "Glovo CARD", 13: "Bolt"
+    7: "Uber Eats", 
+    8: "Wolt", 
+    9: "Just Eat", 
+    10: "Glovo CASH",
+    11: "Wolt", 
+    12: "Glovo CARD", 
+    13: "Bolt"
 }
 
 
@@ -33,6 +38,20 @@ class PosterAPIClient:
         self.api_url = api_url or self.api_url
 
     def _format_date(self, date_str: str) -> str:
+        """This helper method is designed to be robust against common "dirty"
+    date inputs. It handles:
+        - ISO-formatted strings (e.g., "2025-10-18T10:00:00"), stripping the time.
+        - Simple date strings (e.g., "2025-10-18").
+        - Strings that are already in the target "YYYYMMDD" format (idempotency).
+        - Inputs that are incorrectly passed as a single-element list.
+
+        Args:
+            date_str (str): The input date. Can be in 'YYYY-MM-DD',
+            'YYYY-MM-DDTHH:MM:SS', or 'YYYYMMDD' format.
+
+        Returns:
+            str: The date string formatted as 'YYYYMMDD'.
+        """
         if isinstance(date_str, list):
             date_str = date_str[0]
         if len(date_str) == 8 and date_str.isdigit():
@@ -69,7 +88,7 @@ class PosterAPIClient:
             return {"error": str(e)}
 
 
-    # ------------------ Clients ------------------
+    # --- Clients ---
     def get_clients_sales(self, date_from: str = None, date_to: str = None, spot_id: int = None) -> list[dict]:
         params = {
             "type": "clients",
@@ -106,7 +125,7 @@ class PosterAPIClient:
         return normalized
 
 
-    # ------------------ Products ------------------
+    # --- Products ---
     def get_products(self, spot_id: int = None) -> list[dict]:
         params = {}
         if spot_id:
@@ -127,7 +146,7 @@ class PosterAPIClient:
         return normalized
 
 
-    # ------------------ Products Sales------------------
+    # --- Products Sales ---
     def get_products_sales(self, date_from: str = None, date_to: str = None, spot_id: int = None) -> List[dict]:
         params = {
             "type": "products",
@@ -157,7 +176,7 @@ class PosterAPIClient:
         return normalized
     
     
-    #--------------Category------------
+    #--- Category ---
     def get_category(self, spot_id: int = None) -> list[dict]:
         params = {}
         if spot_id:
@@ -174,7 +193,7 @@ class PosterAPIClient:
         ]
 
 
-    # ------------------ Categories ------------------
+    # --- Categories Sales ---
     def get_categories_sales(self, date_from: str = None, date_to: str = None, spot_id: int = None) -> List[dict]:
         params = {
             "type": "categories",
@@ -201,7 +220,7 @@ class PosterAPIClient:
         return normalized
 
 
-    # ------------------ Reports ------------------
+    # --- Reports ---
     def _normalize_shift(self, shift: dict) -> dict:
         return {
             "poster_shift_id": shift.get("cash_shift_id"),
@@ -246,7 +265,7 @@ class PosterAPIClient:
         params = {
             "dateFrom": self._format_date(date_from),
             "dateTo": self._format_date(date_to),
-            "status": 2,  # только закрытые
+            "status": 2,  # close only
             "include_products": str(include_products).lower(),
             "include_delivery": str(include_delivery).lower(),
             "type": "spots",
@@ -267,8 +286,25 @@ class PosterAPIClient:
         data = self.make_request("GET", "dash.getTransactionsProducts", params=params).get("response", [])
         return data
 
-    # ------------------ Асинхронный fetch истории ------------------
+    # --- Async history fetch ---
     async def fetch_history_limited(self, tx_id: str, sem: asyncio.Semaphore):
+        """This method uses a semaphore to limit concurrent API requests. It fetches
+        the transaction history and iterates through its actions to find a 'close'
+        event. From this event, it attempts to parse a JSON payload
+        ('value_text') to extract the 'payment_method_id' and the 'tip_sum'.
+        It handles potential errors during parsing and fetching.
+
+        Args:
+            tx_id (str): The unique identifier for the transaction.
+            sem (asyncio.Semaphore): A semaphore to control concurrency of network requests.
+
+        Returns:
+            tuple[str, list, int | None, float]: A tuple containing:
+                - The original transaction ID (tx_id).
+                - The list of history actions (or an empty list on failure).
+                - The parsed payment_method_id (int) or None if not found/failed.
+                - The parsed tip_sum (float), defaulting to 0.0.
+        """
         async with sem:
             try:
                 history = await asyncio.to_thread(
@@ -310,6 +346,17 @@ class PosterAPIClient:
 
     # ------------------ Fetch all histories ------------------
     async def fetch_all_histories(self, transaction_ids: list[str]):
+        """This method manage the fetching of all transaction histories
+        in parallel. It initializes an asyncio.Semaphore with a fixed limit (5)
+        to manage the load on the external API and then uses asyncio.gather
+        to execute all fetch operations.
+
+        Args:
+            transaction_ids (list[str]): A list of transaction IDs to fetch.
+
+        Returns:
+            list[tuple]: A list where each element is the tuple result from fetch_history_limited().
+        """
         sem = asyncio.Semaphore(5)
         tasks = [self.fetch_history_limited(tx_id, sem) for tx_id in transaction_ids]
         return await asyncio.gather(*tasks)
@@ -317,6 +364,43 @@ class PosterAPIClient:
     # ------------------ Shift Sales ------------------
     @timing_decorator
     def get_sales_by_shift_with_delivery(self, date: str, spot_id: int = 1) -> dict:
+        """This comprehensive method orchestrates several data fetches to build a
+        detailed sales report for a given date. A "business day" is defined as
+        running until 6:00 AM the following day.
+
+        The process is as follows:
+        1.  Fetches all cash shifts for the given `date` and `spot_id`.
+        2.  Fetches all transactions (including products and delivery info) for
+            the relevant time period (from the given date to the next day).
+        3.  Asynchronously fetches transaction histories to get payment method
+            IDs and tip amounts for each transaction.
+        4.  Fetches all individual products (line items) from those transactions.
+        5.  Maps each product to its correct cash shift using its timestamp.
+            Includes special logic to assign pre-shift sales (e.g., after 9 AM
+            but before the first shift's official start) to the first shift.
+        6.  Aggregates products into two main categories: 'regular' (sales
+            made via standard payment methods) and 'delivery' (sales made via
+            delivery service payment methods).
+        7.  'Delivery' sales are further sub-aggregated by both product_id
+            and the specific delivery service (e.g., Wolt, Glovo).
+        8.  Processes and assigns all tips to their respective shift and service.
+        9.  Calculates the 'difference' (discrepancy) between the shift's
+            reported total (cash + card) and the sum of all aggregated
+            'payed_sum' values from transactions.
+
+        Args:
+            date (str): The target date in 'YYYY-MM-DD' format.
+            spot_id (int, optional): The spot/location identifier. Defaults to 1.
+
+        Returns:
+            dict: A dictionary keyed by shift IDs. Each value is a dictionary
+            containing:
+                - 'regular' (list): Sorted list of aggregated regular sales items.
+                - 'delivery' (list): Sorted list of aggregated delivery items.
+                - 'difference' (float): Discrepancy between shift total and transaction sum.
+                - 'tips_by_service' (dict): A breakdown of tips by service name.
+                - 'tips' (float): Total tips for the shift.
+        """
         date_from_dt = datetime.strptime(date, "%Y-%m-%d")
         date_to_dt_limit = (date_from_dt + timedelta(days=1)).replace(hour=6, minute=0, second=0)
         shifts_data = self.get_cash_shifts(date_from=date, date_to=date, spot_id=spot_id)

@@ -85,91 +85,99 @@ export default function CashShifts() {
         d && d !== "0000-00-00 00:00:00" ? new Date(d).toLocaleString() : "";
 
         return (
-        <table className="min-w-full border border-gray-300">
-            <thead className="bg-gray-200">
-            <tr>
-                {headers.map((h) => (
-                <th key={h} className="px-4 py-2 border">
-                    {headerLabels[h]}
-                </th>
-                ))}
-            </tr>
-            </thead>
-            <tbody>
-            {data.map((row, idx) => (
-                <tr key={idx} className="odd:bg-white even:bg-gray-100">
-                <td className="px-4 py-2 border">{formatDate(row.timestart)}</td>
-                <td className="px-4 py-2 border">{formatDate(row.timeend)}</td>
-                <td className="px-4 py-2 border">{(row.amount_start || 0).toFixed(2)}</td>
-                <td className="px-4 py-2 border">{(row.amount_end || 0).toFixed(2)}</td>
-                <td className="px-4 py-2 border">{(row.amount_sell_cash || 0).toFixed(2)}</td>
-                <td className="px-4 py-2 border">{(row.amount_sell_card || 0).toFixed(2)}</td>
-                <td className="px-4 py-2 border">{((row.amount_sell_cash || 0) + (row.amount_sell_card || 0)).toFixed(2)}</td>
-                <td className="px-4 py-2 border">{(row.amount_credit || 0).toFixed(2)}</td>
-                <td className="px-4 py-2 border">{(row.amount_collection || 0).toFixed(2)}</td>
-                </tr>
-            ))}
-            </tbody>
-        </table>
+            <div className="overflow-x-auto border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700">
+                <table className="min-w-full text-sm">
+                    <thead className="bg-gray-100 dark:bg-gray-700">
+                        <tr className="border-b dark:border-gray-700">
+                            {headers.map((h) => (
+                                <th key={h} className="px-4 py-2 border dark:border-gray-600 font-semibold text-left">
+                                    {headerLabels[h]}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data.map((row, idx) => (
+                            <tr key={idx} className="border-t dark:border-gray-700 odd:bg-white even:bg-gray-50 dark:odd:bg-gray-800 dark:even:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600">
+                                <td className="px-4 py-2 border dark:border-gray-600">{formatDate(row.timestart)}</td>
+                                <td className="px-4 py-2 border dark:border-gray-600">{formatDate(row.timeend)}</td>
+                                <td className="px-4 py-2 border dark:border-gray-600 text-right">{(row.amount_start || 0).toFixed(2)}</td>
+                                <td className="px-4 py-2 border dark:border-gray-600 text-right">{(row.amount_end || 0).toFixed(2)}</td>
+                                <td className="px-4 py-2 border dark:border-gray-600 text-right">{(row.amount_sell_cash || 0).toFixed(2)}</td>
+                                <td className="px-4 py-2 border dark:border-gray-600 text-right">{(row.amount_sell_card || 0).toFixed(2)}</td>
+                                <td className="px-4 py-2 border dark:border-gray-600 text-right">{((row.amount_sell_cash || 0) + (row.amount_sell_card || 0)).toFixed(2)}</td>
+                                <td className="px-4 py-2 border dark:border-gray-600 text-right">{(row.amount_credit || 0).toFixed(2)}</td>
+                                <td className="px-4 py-2 border dark:border-gray-600 text-right">{(row.amount_collection || 0).toFixed(2)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         );
     };
 
     return (
-        <div>
+        <div className="text-gray-900 dark:text-gray-100">
         {/* Фильтр по датам */}
         <div className="mb-4 flex gap-2 items-center flex-wrap">
-            <span>С:</span>
+            <span className="dark:text-gray-300">С:</span>
             <DatePicker
-            selected={dateFrom}
-            onChange={setDateFrom}
-            dateFormat="yyyy-MM-dd"
+                selected={dateFrom}
+                onChange={setDateFrom}
+                dateFormat="yyyy-MM-dd"
+                className="border px-2 py-1 rounded bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
             />
-            <span>По:</span>
+            <span className="dark:text-gray-300">По:</span>
             <DatePicker
-            selected={dateTo}
-            onChange={setDateTo}
-            dateFormat="yyyy-MM-dd"
+                selected={dateTo}
+                onChange={setDateTo}
+                dateFormat="yyyy-MM-dd"
+                className="border px-2 py-1 rounded bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
             />
             <button
-            onClick={() => {
-                setDateFrom(null);
-                setDateTo(null);
-            }}
-            className="bg-gray-300 text-white px-2 py-1 rounded"
+                onClick={() => {
+                    setDateFrom(null);
+                    setDateTo(null);
+                }}
+                className="bg-gray-300 text-gray-800 px-2 py-1 rounded hover:bg-gray-400 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
             >
-            Сбросить
+                Сбросить
             </button>
-            <select value={spotId} onChange={e => setSpotId(Number(e.target.value))}>
+            <select
+                value={spotId}
+                onChange={e => setSpotId(Number(e.target.value))}
+                className="border px-2 py-1 rounded bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+            >
                 <option value={1}>Ресторан</option>
                 <option value={2}>Доставка</option>
             </select>
         </div>
 
         {/* Итоги */}
-        <div className="mb-4 flex gap-4 flex-wrap">
-            <div className="bg-white p-4 rounded shadow">
-            <div className="text-gray-500">Общая выручка</div>
-            <div className="text-xl font-bold">{totals.revenue.toFixed(2)}</div>
+        <div className="mb-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            <div className="bg-white dark:bg-gray-800 p-4 rounded shadow dark:border dark:border-gray-700">
+                <div className="text-gray-500 dark:text-gray-400">Общая выручка</div>
+                <div className="text-xl font-bold">{totals.revenue.toFixed(2)}</div>
             </div>
-            <div className="bg-white p-4 rounded shadow">
-            <div className="text-gray-500">Наличные</div>
-            <div className="text-xl font-bold">{totals.cash.toFixed(2)}</div>
+            <div className="bg-white dark:bg-gray-800 p-4 rounded shadow dark:border dark:border-gray-700">
+                <div className="text-gray-500 dark:text-gray-400">Наличные</div>
+                <div className="text-xl font-bold">{totals.cash.toFixed(2)}</div>
             </div>
-            <div className="bg-white p-4 rounded shadow">
-            <div className="text-gray-500">Карта</div>
-            <div className="text-xl font-bold">{totals.card.toFixed(2)}</div>
+            <div className="bg-white dark:bg-gray-800 p-4 rounded shadow dark:border dark:border-gray-700">
+                <div className="text-gray-500 dark:text-gray-400">Карта</div>
+                <div className="text-xl font-bold">{totals.card.toFixed(2)}</div>
             </div>
-            <div className="bg-white p-4 rounded shadow">
-            <div className="text-gray-500">Расходы</div>
-            <div className="text-xl font-bold">{totals.credit.toFixed(2)}</div>
+            <div className="bg-white dark:bg-gray-800 p-4 rounded shadow dark:border dark:border-gray-700">
+                <div className="text-gray-500 dark:text-gray-400">Расходы</div>
+                <div className="text-xl font-bold">{totals.credit.toFixed(2)}</div>
             </div>
-            <div className="bg-white p-4 rounded shadow">
-            <div className="text-gray-500">Инкассация</div>
-            <div className="text-xl font-bold">{totals.collection.toFixed(2)}</div>
+            <div className="bg-white dark:bg-gray-800 p-4 rounded shadow dark:border dark:border-gray-700">
+                <div className="text-gray-500 dark:text-gray-400">Инкассация</div>
+                <div className="text-xl font-bold">{totals.collection.toFixed(2)}</div>
             </div>
         </div>
 
-        {loading ? <div>Загрузка...</div> : renderTable()}
+        {loading ? <div className="text-gray-500 dark:text-gray-400">Загрузка...</div> : renderTable()}
         </div>
     );
-    }
+}    

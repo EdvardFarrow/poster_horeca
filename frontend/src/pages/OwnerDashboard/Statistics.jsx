@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
-import { getStatistics } from "../../api/poster"; // рабочий клиент API
+import { getStatistics } from "../../api/poster"; 
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
 export default function Statistics() {
   const TYPES = ["waiters", "clients", "products", "categories"];
 
-  // Русские названия метрик
   const METRIC_LABELS = {
     revenue: "Выручка",
     profit: "Прибыль",

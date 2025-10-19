@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import 'react-calendar/dist/Calendar.css';
-import axios from "axios";
 
 export default function EmployeeCalendar({ onSelectDate }) {
     const [myShifts, setMyShifts] = useState([]);
     const [today, setToday] = useState(new Date());
 
     useEffect(() => {
-        axios.get("/api/salary/records/current/").then(res => {
+        api.get("/api/salary/records/current/").then(res => {
         const shifts = res.data.shifts.map(s => ({
             date: new Date(s.date),
             role: s.role,

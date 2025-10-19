@@ -82,13 +82,13 @@ export default function Analytics() {
   const colors = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#a83279", "#32a852"];
 
   return (
-    <div>
+    <div className="text-gray-900 dark:text-gray-100 p-4">
       <h2 className="text-xl font-bold mb-4">Аналитика</h2>
 
-      {/* фильтры */}
+      {/* filters */}
       <div className="flex flex-wrap gap-4 mb-6 items-end">
         <div>
-          <label className="block text-sm font-medium">Официанты</label>
+          <label className="block text-sm font-medium dark:text-gray-300">Официанты</label>
           <select
             multiple
             value={selectedWaiters}
@@ -97,7 +97,7 @@ export default function Analytics() {
                 Array.from(e.target.selectedOptions, (opt) => opt.value)
               )
             }
-            className="border rounded p-2 w-48"
+            className="border rounded p-2 w-48 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
           >
             {waiters.map((w) => (
               <option key={w.id} value={w.id}>
@@ -108,14 +108,14 @@ export default function Analytics() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium">Метрики</label>
+          <label className="block text-sm font-medium dark:text-gray-300">Метрики</label>
           <select
             multiple
             value={select}
             onChange={(e) =>
               setSelect(Array.from(e.target.selectedOptions, (opt) => opt.value))
             }
-            className="border rounded p-2 w-48"
+            className="border rounded p-2 w-48 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
           >
             <option value="revenue">Выручка</option>
             <option value="profit">Прибыль</option>
@@ -124,11 +124,11 @@ export default function Analytics() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium">Интервал</label>
+          <label className="block text-sm font-medium dark:text-gray-300">Интервал</label>
           <select
             value={interpolate}
             onChange={(e) => setInterpolate(e.target.value)}
-            className="border rounded p-2"
+            className="border rounded p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
           >
             <option value="day">День</option>
             <option value="week">Неделя</option>
@@ -137,31 +137,35 @@ export default function Analytics() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium">С даты</label>
+          <label className="block text-sm font-medium dark:text-gray-300">С даты</label>
           <input
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="border rounded p-2"
+            className="border rounded p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+            // Apply dark theme styles for the date picker's calendar icon if needed
+            style={{ colorScheme: 'dark' }} // Basic hint for browsers
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium">По дату</label>
+          <label className="block text-sm font-medium dark:text-gray-300">По дату</label>
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="border rounded p-2"
+            className="border rounded p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+            style={{ colorScheme: 'dark' }} // Basic hint for browsers
           />
         </div>
       </div>
 
-      {/* график */}
+      {/* chart */}
       {loading ? (
-        <p>Загрузка...</p>
+        <p className="text-gray-500 dark:text-gray-400">Загрузка...</p>
       ) : (
         <ResponsiveContainer width="100%" height={400}>
+          {/* Note: Recharts styling needs specific props for dark mode */}
           <LineChart data={chartData}>
             {selectedWaiters.map((waiterId, i) =>
               select.map((metric, j) => (
@@ -169,19 +173,20 @@ export default function Analytics() {
                   key={`${waiterId}-${metric}`}
                   type="monotone"
                   dataKey={`${metric}_${waiterId}`}
-                  stroke={colors[(i * select.length + j) % colors.length]}
+                  stroke={colors[(i * select.length + j) % colors.length]} // Consider dark mode compatible colors
                   name={`${waiters.find((w) => w.id === waiterId)?.name} - ${metric}`}
                 />
               ))
             )}
-            <CartesianGrid stroke="#ccc" />
-            <XAxis dataKey="period" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
+            {/* Adjust grid, axes, tooltip, legend colors for dark mode */}
+            <CartesianGrid stroke="#ccc" strokeDasharray="5 5" className="dark:stroke-gray-600" />
+            <XAxis dataKey="period" tick={{ fill: '#6b7280' }} className="dark:tick={{ fill: '#9ca3af' }}" />
+            <YAxis tick={{ fill: '#6b7280' }} className="dark:tick={{ fill: '#9ca3af' }}" />
+            <Tooltip contentStyle={{ backgroundColor: 'white', color: '#374151' }} wrapperClassName="dark:contentStyle={{ backgroundColor: '#1f2937', color: '#d1d5db' }}" />
+            <Legend wrapperStyle={{ color: '#374151' }} className="dark:wrapperStyle={{ color: '#d1d5db' }}" />
           </LineChart>
         </ResponsiveContainer>
       )}
     </div>
   );
-}
+}  

@@ -1,44 +1,37 @@
-import axios from 'axios';
+import api from '../api'; 
 
-const API_URL = 'http://localhost:8000/api/auth/'; 
+export const login = async (username, password) => {
+    try {
+        const response = await api.post('/api/auth/token/', {
+        username,
+        password,
+        });
+        
+        localStorage.setItem('access', response.data.access);
+        localStorage.setItem('refresh', response.data.refresh);
+        
+        return response.data; 
 
-const api = axios.create({
-    baseURL: API_URL,
-    headers: { 'Content-Type': 'application/json' },
-});
+    } catch (error) {
+        console.error('Login failed:', error);
+        throw error; 
+    }
+    };
 
-export async function register({ username, password, fullname, role = 'employee' }) {
-    const { data } = await api.post('register/', { username, password, fullname, role });
-    return data;
-}
+    export const getUserInfo = async () => {
+    try {
+        const response = await api.get('/api/auth/user/'); 
+        
+        return response.data; 
 
+    } catch (error) {
+        console.error('Failed to get user info:', error);
+        throw error;
+    }
+};
 
-export async function login(username, password) {
-    const { data } = await api.post('login/', { username, password });
-
-    localStorage.setItem('access', data.access);
-    localStorage.setItem('refresh', data.refresh);
-    return data;
-}
-
-export async function registerAndLogin({ username, password, fullname, role = 'employee' }) {
-    await register({ username, password, fullname, role }); 
-    return await login(username, password); 
-}
-
-export function logout() {
+export const logout = () => {
     localStorage.removeItem('access');
     localStorage.removeItem('refresh');
-}
-
-export async function getUserInfo() {
-    const token = localStorage.getItem('access');
-    if (!token) return null;
-
-    const { data } = await api.get('me/', {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    });
-    return data;
+    window.location.href = '/login';
 }

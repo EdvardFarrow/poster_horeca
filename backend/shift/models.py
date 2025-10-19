@@ -19,8 +19,8 @@ class Shift(models.Model):
         return f"Shift on {self.date} (ID: {self.shift_id or self.id})"
 
     class Meta:
-        verbose_name = _("Work Shift")
-        verbose_name_plural = _("Work Shifts")
+        verbose_name =("Work Shift")
+        verbose_name_plural =("Work Shifts")
         ordering = ['-date']
 
 

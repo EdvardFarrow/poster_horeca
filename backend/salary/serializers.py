@@ -7,37 +7,45 @@ from .models import SalaryRule, SalaryRecord, SalaryRuleProduct
 
 
 class SalaryRuleProductSerializer(serializers.ModelSerializer):
-    product = serializers.PrimaryKeyRelatedField(
-        queryset=Product.objects.all(), source='product_obj'
-    )
-    
+    product_name = serializers.CharField(source='product.product_name', read_only=True)
 
-    def to_internal_value(self, data):
-        try:
-            product_obj = Product.objects.get(product_id=data['product'] if isinstance(data, dict) else data)
-        except Product.DoesNotExist:
-            raise serializers.ValidationError(f"Product with product_id={data} does not exist")
-        return {
-            'product_obj': product_obj,
-            'fixed': data['fixed'] if isinstance(data, dict) else 0
-        }
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+
 
     class Meta:
         model = SalaryRuleProduct
-        fields = ["product", "fixed"]
+        fields = [
+            'product',         
+            'product_name',    
+            'fixed',           
+        ]
+        read_only_fields = ['product_name']
 
 
 class SalaryRuleSerializer(serializers.ModelSerializer):
     workshops = serializers.PrimaryKeyRelatedField(queryset=Workshop.objects.all(), many=True)
-    product_fixed = SalaryRuleProductSerializer(many=True, required=False)
     role_name = serializers.CharField(source="role.name", read_only=True)
 
+    product_fixed = SalaryRuleProductSerializer(
+        source='salaryruleproduct_set',
+        many=True, 
+        required=False
+    )
+    
     class Meta:
         model = SalaryRule
-        fields = "__all__"
+        fields = [
+            'id',
+            'role',
+            'role_name',
+            'workshops',
+            'percent',
+            'fixed_per_shift',
+            'product_fixed' 
+        ]
 
     def create(self, validated_data):
-        product_fixed_data = validated_data.pop("product_fixed", [])
+        product_fixed_data = validated_data.pop("salaryruleproduct_set", [])
         workshops = validated_data.pop("workshops", [])
 
         salary_rule = SalaryRule.objects.create(**validated_data)
@@ -46,32 +54,31 @@ class SalaryRuleSerializer(serializers.ModelSerializer):
         for pf in product_fixed_data:
             SalaryRuleProduct.objects.create(
                 salary_rule=salary_rule,
-                product=pf['product_obj'],
+                product=pf['product'], 
                 fixed=pf['fixed']
             )
-
         return salary_rule
 
     def update(self, instance, validated_data):
-        product_fixed_data = validated_data.pop("product_fixed", None)
+        product_fixed_data = validated_data.pop("salaryruleproduct_set", None)
         workshops = validated_data.pop("workshops", None)
 
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
+        instance.role = validated_data.get('role', instance.role)
+        instance.percent = validated_data.get('percent', instance.percent)
+        instance.fixed_per_shift = validated_data.get('fixed_per_shift', instance.fixed_per_shift)
         instance.save()
 
         if workshops is not None:
             instance.workshops.set(workshops)
 
         if product_fixed_data is not None:
-            instance.salaryruleproduct_set.all().delete()
+            instance.salaryruleproduct_set.all().delete() 
             for pf in product_fixed_data:
                 SalaryRuleProduct.objects.create(
                     salary_rule=instance,
-                    product=pf['product_obj'],
+                    product=pf['product'],
                     fixed=pf['fixed']
                 )
-
         return instance
 
 

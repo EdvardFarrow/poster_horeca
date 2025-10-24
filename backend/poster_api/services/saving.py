@@ -52,7 +52,7 @@ def save_shift_sales_to_db(api_client, date_str: str, spot_id: int = None):
     Saves sales by shift in bulk.
 
     This function fetches sales data, then processes it in memory to prepare
-    all parent (ShiftSale) and child (ShiftSaleItem) records. 
+    all parent (ShiftSale) and child (ShiftSaleItem) records.
 
     Args:
         api_client: An instance of the API client.
@@ -69,14 +69,29 @@ def save_shift_sales_to_db(api_client, date_str: str, spot_id: int = None):
         logger.info(f"No sales data found for date {date_str}.")
         return
 
-    shift_ids = sales_by_shift.keys()
+    try:
+        api_shift_id_strs = list(sales_by_shift.keys())
+        api_shift_ids = [int(sid) for sid in api_shift_id_strs]
+    except (ValueError, TypeError) as e:
+        logger.error(f"Invalid shift_id key from API. Not all keys are integers: {e}. Keys: {sales_by_shift.keys()}")
+        return
+
     shifts_data_prepared = {}
-    for shift_id, shift_data in sales_by_shift.items():
+    for shift_id_str in api_shift_id_strs:
         try:
-            reg_revenue = sum(Decimal(item.get('payed_sum', 0)) for item in shift_data['regular'])
-            del_revenue = sum(Decimal(item.get('payed_sum', 0)) for item in shift_data['delivery'])
-            reg_profit = sum(Decimal(item.get('profit', 0)) for item in shift_data['regular'])
-            del_profit = sum(Decimal(item.get('profit', 0)) for item in shift_data['delivery'])
+            shift_id = int(shift_id_str)
+            shift_data = sales_by_shift[shift_id_str]
+        except (ValueError, TypeError):
+            logger.warning(f"Skipping non-integer shift_id {shift_id_str}.")
+            continue
+        except KeyError:
+            continue
+            
+        try:
+            reg_revenue = sum(Decimal(item.get('payed_sum', 0)) for item in shift_data.get('regular', []))
+            del_revenue = sum(Decimal(item.get('payed_sum', 0)) for item in shift_data.get('delivery', []))
+            reg_profit = sum(Decimal(item.get('profit', 0)) for item in shift_data.get('regular', []))
+            del_profit = sum(Decimal(item.get('profit', 0)) for item in shift_data.get('delivery', []))
             
             total_revenue = reg_revenue + del_revenue
             total_profit = reg_profit + del_profit
@@ -97,7 +112,7 @@ def save_shift_sales_to_db(api_client, date_str: str, spot_id: int = None):
             
     with transaction.atomic():
         existing_shifts = {
-            s.shift_id: s for s in ShiftSale.objects.filter(shift_id__in=shift_ids, date=date_str)
+            s.shift_id: s for s in ShiftSale.objects.filter(shift_id__in=api_shift_ids, date=date_str)
         }
         shifts_to_create = []
         shifts_to_update = []
@@ -105,33 +120,47 @@ def save_shift_sales_to_db(api_client, date_str: str, spot_id: int = None):
         for shift_id, defaults in shifts_data_prepared.items():
             if shift_id in existing_shifts:
                 shift_obj = existing_shifts[shift_id]
+                has_changed = False
                 for key, value in defaults.items():
-                    setattr(shift_obj, key, value)
-                shifts_to_update.append(shift_obj)
+                    if getattr(shift_obj, key) != value:
+                        setattr(shift_obj, key, value)
+                        has_changed = True
+                if has_changed:
+                    shifts_to_update.append(shift_obj)
             else:
                 shifts_to_create.append(ShiftSale(shift_id=shift_id, date=date_str, **defaults))
         
         if shifts_to_create:
             ShiftSale.objects.bulk_create(shifts_to_create)
         if shifts_to_update:
-            update_fields = shifts_data_prepared[list(shifts_data_prepared.keys())[0]].keys()
-            ShiftSale.objects.bulk_update(shifts_to_update, update_fields)
+            if shifts_data_prepared:
+                update_fields = shifts_data_prepared[list(shifts_data_prepared.keys())[0]].keys()
+                ShiftSale.objects.bulk_update(shifts_to_update, update_fields)
+
 
         shift_obj_map = {
-            s.shift_id: s for s in ShiftSale.objects.filter(shift_id__in=shift_ids, date=date_str)
+            s.shift_id: s for s in ShiftSale.objects.filter(shift_id__in=api_shift_ids, date=date_str)
         }
 
         existing_items = ShiftSaleItem.objects.filter(shift_sale__in=shift_obj_map.values())
+        
         existing_items_map = {
-            (item.shift_sale.shift_id, item.product_name, item.category_name): item for item in existing_items
+            (item.shift_sale.shift_id, item.product_name or "", item.category_name): item for item in existing_items
         }
 
         items_to_create = []
         items_to_update = []
         
-        for shift_id, shift_data in sales_by_shift.items():
-            shift_obj = shift_obj_map.get(shift_id)
+        for shift_id_str in api_shift_id_strs:
+            try:
+                shift_id = int(shift_id_str)
+                shift_data = sales_by_shift[shift_id_str]
+            except (ValueError, TypeError, KeyError):
+                continue 
+
+            shift_obj = shift_obj_map.get(shift_id) 
             if not shift_obj:
+                logger.warning(f"ShiftSale object for shift_id {shift_id} not found in DB map. Skipping items.")
                 continue
 
             for category in ['regular', 'delivery']:
@@ -151,13 +180,18 @@ def save_shift_sales_to_db(api_client, date_str: str, spot_id: int = None):
                         continue
                     
                     product_name = product.get('product_name') or ""
+                    
                     item_key = (shift_id, product_name, category)
                     
                     if item_key in existing_items_map:
                         item_obj = existing_items_map[item_key]
+                        has_changed_item = False
                         for key, value in defaults.items():
-                            setattr(item_obj, key, value)
-                        items_to_update.append(item_obj)
+                            if getattr(item_obj, key) != value:
+                                setattr(item_obj, key, value)
+                                has_changed_item = True
+                        if has_changed_item:
+                            items_to_update.append(item_obj)
                     else:
                         items_to_create.append(
                             ShiftSaleItem(
@@ -175,8 +209,6 @@ def save_shift_sales_to_db(api_client, date_str: str, spot_id: int = None):
             ShiftSaleItem.objects.bulk_update(items_to_update, item_update_fields)
             
     logger.info(f"Processed sales for {date_str}. Shifts: {len(shifts_to_create)} created, {len(shifts_to_update)} updated. Items: {len(items_to_create)} created, {len(items_to_update)} updated.")
-
-
 
 
 def _parse_and_make_aware(date_str: Optional[str]) -> Optional[datetime]:

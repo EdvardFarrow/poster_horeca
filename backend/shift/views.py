@@ -5,6 +5,7 @@ from .models import Shift, ShiftEmployee
 from poster_api.models import ShiftSale
 from .serializers import ShiftSerializer
 from users.models import Employee
+from salary.models import SalaryRecord 
 from datetime import datetime
 
 class ShiftViewSet(viewsets.ModelViewSet):
@@ -43,14 +44,34 @@ class ShiftViewSet(viewsets.ModelViewSet):
         Returns:
             Response: A 201 status with a summary of created and updated shifts.
         """
-        data = request.data.get("shifts", [])
-        created_count = 0
-        updated_count = 0
+        data = request.data
+        month = data.get('month')
+        year = data.get('year')
+        shifts_payload = data.get("shifts", [])
 
-        for item in data:
+        if not month or not year:
+            return Response(
+                {"error": "Month and Year are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        shifts_to_delete = Shift.objects.filter(
+            date__year=year, 
+            date__month=month
+        )
+        
+        SalaryRecord.objects.filter(shift__in=shifts_to_delete).delete()
+        
+        shifts_to_delete.delete()
+        
+        created_count = 0
+        updated_count = 0 
+
+        for item in shifts_payload:
             emp_ids = item.get("employees", [])
             date_str = item.get("date")
-            if not date_str:
+            
+            if not date_str or not emp_ids:
                 continue
 
             try:
@@ -64,34 +85,29 @@ class ShiftViewSet(viewsets.ModelViewSet):
             else:
                 poster_shift_id = str(date_obj)  
 
-            shift, created_shift = Shift.objects.update_or_create(
+            shift = Shift.objects.create(
                 shift_id=poster_shift_id,
-                defaults={"date": date_obj},
+                date=date_obj,
             )
-
-            if created_shift:
-                created_count += 1
-            else:
-                updated_count += 1
-
+            created_count += 1
+            
             for emp_id in emp_ids:
                 try:
                     employee = Employee.objects.get(id=emp_id)
-                    ShiftEmployee.objects.update_or_create(
+                    ShiftEmployee.objects.create(
                         shift=shift,
                         employee=employee,
-                        defaults={"role": employee.role},
+                        role=employee.role,
                     )
                 except Employee.DoesNotExist:
                     continue
 
-            ShiftEmployee.objects.filter(shift=shift).exclude(employee_id__in=emp_ids).delete()
 
         return Response(
             {
                 "status": "ok",
                 "shifts_created": created_count,
-                "shifts_updated": updated_count
+                "shifts_updated": updated_count 
             },
             status=status.HTTP_201_CREATED
         )

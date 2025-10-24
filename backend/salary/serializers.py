@@ -9,7 +9,10 @@ from .models import SalaryRule, SalaryRecord, SalaryRuleProduct
 class SalaryRuleProductSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.product_name', read_only=True)
 
-    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    product = serializers.SlugRelatedField(
+        slug_field='product_id', 
+        queryset=Product.objects.all()
+    )
 
 
     class Meta:
@@ -27,7 +30,7 @@ class SalaryRuleSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source="role.name", read_only=True)
 
     product_fixed = SalaryRuleProductSerializer(
-        source='salaryruleproduct_set',
+        source='salaryruleproduct_set', 
         many=True, 
         required=False
     )
@@ -51,34 +54,29 @@ class SalaryRuleSerializer(serializers.ModelSerializer):
         salary_rule = SalaryRule.objects.create(**validated_data)
         salary_rule.workshops.set(workshops)
 
-        for pf in product_fixed_data:
-            SalaryRuleProduct.objects.create(
-                salary_rule=salary_rule,
-                product=pf['product'], 
-                fixed=pf['fixed']
-            )
+        for pf_data in product_fixed_data:
+            SalaryRuleProduct.objects.create(salary_rule=salary_rule, **pf_data)
+            
         return salary_rule
 
     def update(self, instance, validated_data):
         product_fixed_data = validated_data.pop("salaryruleproduct_set", None)
-        workshops = validated_data.pop("workshops", None)
+        workshops_data = validated_data.pop("workshops", None)
 
         instance.role = validated_data.get('role', instance.role)
         instance.percent = validated_data.get('percent', instance.percent)
         instance.fixed_per_shift = validated_data.get('fixed_per_shift', instance.fixed_per_shift)
         instance.save()
 
-        if workshops is not None:
-            instance.workshops.set(workshops)
+        if workshops_data is not None:
+            instance.workshops.set(workshops_data)
 
         if product_fixed_data is not None:
             instance.salaryruleproduct_set.all().delete() 
-            for pf in product_fixed_data:
-                SalaryRuleProduct.objects.create(
-                    salary_rule=instance,
-                    product=pf['product'],
-                    fixed=pf['fixed']
-                )
+            
+            for pf_data in product_fixed_data:
+                SalaryRuleProduct.objects.create(salary_rule=instance, **pf_data)
+                
         return instance
 
 

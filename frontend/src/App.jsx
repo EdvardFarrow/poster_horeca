@@ -7,6 +7,8 @@ import Statistics from './pages/OwnerDashboard/Statistics';
 import Reports from './pages/OwnerDashboard/Reports';
 import ProtectedEmployeeDashboard from './pages/EmployeeDashboard/ProtectedEmployeeDashboard';
 import Employees from "./pages/OwnerDashboard/Employees";
+import DashboardHome from './pages/OwnerDashboard/DashboardHome';
+import RoleManager from './pages/OwnerDashboard/RoleManager';
 
 
 
@@ -30,13 +32,14 @@ export default function App() {
       {/*<Route path="/register" element={<Register />} />*/}
       <Route path="/employeedashboard" element={<ProtectedEmployeeDashboard />} />
 
-      {/* Страница владельца с вкладками */}
       <Route path="/ownerdashboard" element={<OwnerDashboard />}>
-        <Route index element={<Salaries />} />
+        <Route index element={<DashboardHome />} /> 
+        <Route path="home" element={<DashboardHome />} />
         <Route path="salaries" element={<Salaries />} />
         <Route path="statistics" element={<Statistics />} />
         <Route path="reports" element={<Reports />} />
         <Route path="employees" element={<Employees />} />
+        <Route path="roles" element={<RoleManager />} /> 
       </Route>
 
       <Route path="*" element={<NotFound />} />

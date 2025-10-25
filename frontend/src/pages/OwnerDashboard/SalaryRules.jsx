@@ -85,13 +85,27 @@ export default function SalaryRules() {
         setFixedPerShift(rule.fixed_per_shift || "");
         setSelectedWorkshops(rule.workshops || []);
         
-        const productIds = rule.product_fixed.map(pf => pf.product);
-        const productFixedMap = Object.fromEntries(
-            rule.product_fixed.map(pf => [pf.product, pf.fixed])
-        );
-        
-        setSelectedProducts(productIds);
-        setFixedPerProduct(productFixedMap);
+        const correctProductIds = [];
+        const correctProductFixedMap = {};
+
+        rule.product_fixed.forEach(pf_from_api => {
+            const externalProductId = pf_from_api.product; 
+
+            const matchingProduct = productsList.find(
+                p => Number(p.product_id) === Number(externalProductId)
+            );
+
+            if (matchingProduct) {
+                const internalDjangoId = matchingProduct.id; 
+                correctProductIds.push(internalDjangoId);
+                correctProductFixedMap[internalDjangoId] = pf_from_api.fixed;
+            } else {
+                console.warn(`Продукт с внешним ID ${externalProductId} не найден. Пропускаем.`);
+            }
+        });
+
+        setSelectedProducts(correctProductIds);
+        setFixedPerProduct(correctProductFixedMap);
     };
 
     const handleDeleteRule = (ruleId) => {
@@ -115,14 +129,13 @@ export default function SalaryRules() {
             percent: percent ? Number(percent) : null,
             fixed_per_shift: fixedPerShift ? Number(fixedPerShift) : null,
             workshops: cleanWorkshops.map(Number),
-            product_fixed: cleanProducts
-                .filter(p => p)
-                .map(p => ({
-                    product: productsList.find(prod => Number(prod.id) === Number(p))?.id || null, 
-                    fixed: Number(fixedPerProduct[p] || 0) 
-                })).filter(pf => pf.product)
+            
+            product_fixed: cleanProducts.map(internalProductId => ({
+                product: internalProductId, 
+                fixed: Number(fixedPerProduct[internalProductId] || 0)
+            }))
         };
-
+        console.log("[SUBMIT] Отправляю на сервер:", payload);
         const isEditing = editingRule !== null;
 
         const request = isEditing
@@ -144,6 +157,7 @@ export default function SalaryRules() {
             }
         });
     };
+
 
     return (
         <div className="text-gray-900 dark:text-gray-100">

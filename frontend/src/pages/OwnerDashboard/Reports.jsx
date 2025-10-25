@@ -9,7 +9,7 @@ export default function Reports() {
         <div className="flex w-full min-h-screen bg-gray-50 dark:bg-gray-900"> 
         {/* Левая боковая панель для навигации */}
         <div className="p-6 bg-white dark:bg-gray-800 flex-none w-64 border-r border-gray-200 dark:border-gray-700">
-            <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-gray-100">Отчёты</h1>
+            <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-gray-100"></h1>
 
             <nav className="text-gray-700 dark:text-gray-300">
             <ul>

@@ -11,6 +11,8 @@ export default function ShiftTable() {
     const [days, setDays] = useState([]);
     const [shifts, setShifts] = useState({});
 
+    const [isSaving, setIsSaving] = useState(false);
+
     const fetchEmployees = async () => {
         try {
             const res = await api.get(`/api/auth/employee/`);
@@ -57,6 +59,8 @@ export default function ShiftTable() {
 
 
     const toggleShift = (empId, day) => {
+        if (isSaving) return;
+
         setShifts((prev) => ({
             ...prev,
             [empId]: {
@@ -67,13 +71,19 @@ export default function ShiftTable() {
     };
 
     const saveShifts = async () => {
+        setIsSaving(true);
         const payloadMap = {};
+
+        days.forEach(day => {
+            const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            payloadMap[date] = [];
+        });
 
         Object.entries(shifts).forEach(([empId, daysWorked]) => {
             Object.entries(daysWorked).forEach(([day, worked]) => {
                 if (worked) {
                     const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                    if (!payloadMap[date]) payloadMap[date] = [];
+                    
                     payloadMap[date].push(Number(empId));
                 }
             });
@@ -82,11 +92,17 @@ export default function ShiftTable() {
         const payload = Object.entries(payloadMap).map(([date, employees]) => ({ date, employees }));
 
         try {
-            await api.post(`/api/shifts/save_month/`, { shifts: payload });
+            await api.post(`/api/shifts/save_month/`, { 
+                shifts: payload,
+                month: month,
+                year: year 
+            });
             alert("Смены сохранены!");
         } catch (err) {
             console.error("Ошибка сохранения смен:", err);
-            alert("Ошибка сохранения!");
+            alert("Ошибка сохранения! Попробуйте обновить страницу.");
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -99,7 +115,7 @@ export default function ShiftTable() {
 
     const getFormattedHeader = () => {
         const d = new Date(year, month - 1);
-        const monthName = d.toLocaleString('default', { month: 'long' });
+        const monthName = d.toLocaleString('ru-RU', { month: 'long' });
         const capitalizedMonthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
         return `Смены за ${capitalizedMonthName} ${year}`;
     };
@@ -112,13 +128,15 @@ export default function ShiftTable() {
             <div className="flex gap-2">
                 <button 
                     onClick={() => handleChangeMonth(-1)} 
-                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                    disabled={isSaving}
+                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                     &lt; Пред.
                 </button>
                 <button 
                     onClick={() => handleChangeMonth(1)} 
-                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                    disabled={isSaving}
+                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                     След. &gt;
                 </button>
@@ -129,7 +147,7 @@ export default function ShiftTable() {
             <table className="min-w-full text-sm border-collapse">
             <thead className="bg-gray-100 dark:bg-gray-700">
                 <tr className="border-b dark:border-gray-700">
-                <th className="border p-2 text-left font-semibold dark:border-gray-600">Сотрудник</th>
+                <th className="border p-2 text-left font-semibold dark:border-gray-600 sticky left-0 bg-gray-100 dark:bg-gray-700 z-10">Сотрудник</th>
                 {days.map((day) => (
                     <th key={day} className="border p-2 text-center w-10 font-semibold dark:border-gray-600">
                     {day}
@@ -140,12 +158,14 @@ export default function ShiftTable() {
             <tbody>
                 {employees.map((emp) => (
                 <tr key={emp.id} className="dark:hover:bg-gray-900">
-                    <td className="border p-2 font-medium dark:border-gray-600">{emp.name}</td>
+                    <td className="border p-2 font-medium dark:border-gray-600 sticky left-0 bg-white dark:bg-gray-800 z-10">{emp.name}</td>
                     {days.map((day) => (
                     <td
                         key={day}
                         onClick={() => toggleShift(emp.id, day)}
-                        className={`border p-2 text-center cursor-pointer select-none dark:border-gray-600 ${
+                        className={`border p-2 text-center select-none dark:border-gray-600 ${
+                        isSaving ? 'cursor-wait opacity-70' : 'cursor-pointer'
+                        } ${
                         shifts[emp.id]?.[day] 
                             ? "bg-green-400 text-gray-900" 
                             : "bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -163,9 +183,10 @@ export default function ShiftTable() {
         <div className="mt-4 flex justify-end">
             <button
                 onClick={saveShifts}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-500"
+                disabled={isSaving}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-50 disabled:cursor-wait"
                 >
-                Сохранить изменения
+                {isSaving ? "Сохранение..." : "Сохранить изменения"}
             </button>
         </div>
         </div>

@@ -1,3 +1,9 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import (
+    SalaryRule, 
+    SalaryRuleProduct, 
+)
+
+admin.site.register(SalaryRule)
+admin.site.register(SalaryRuleProduct)

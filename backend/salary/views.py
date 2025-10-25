@@ -22,10 +22,11 @@ logger = logging.getLogger(__name__)
 
 class SalaryRecordViewSet(viewsets.ModelViewSet):
     """
-    Provides API endpoint for accessing historical, saved salary records.
+    API endpoint for accessing and managing saved SalaryRecord entries.
     
-    This ViewSet is used to retrieve salary data that has already been
-    calculated and saved to the `SalaryRecord` model.
+    This ViewSet reads from and writes to the 'details' JSONField,
+    ensuring all data (including bonus breakdowns, write-offs, etc.) 
+    is handled correctly.
     """
     permission_classes = [IsAuthenticated]
     
@@ -33,6 +34,10 @@ class SalaryRecordViewSet(viewsets.ModelViewSet):
     serializer_class = SalaryRecordSerializer
 
     def list(self, request, *args, **kwargs):
+        """
+        Retrieves all salary records for a given month and year,
+        formatted for the frontend salary table.
+        """
         try:
             year = int(request.query_params.get('year'))
             month = int(request.query_params.get('month'))
@@ -52,44 +57,40 @@ class SalaryRecordViewSet(viewsets.ModelViewSet):
             salaries_by_employee[emp_id][day_of_month] = {
                 "id": calc.id,
                 "total_salary": calc.total_salary,
-                "details": {
-                    "fixed": calc.fixed_part,
-                    "percent": calc.percent_part,
-                    "bonus": calc.bonus_part,
-                    "write_off": calc.write_off, 
-                    "comment": calc.comment,
-                }
+                "details": calc.details 
             }
         
         return Response(salaries_by_employee)
     
     def partial_update(self, request, *args, **kwargs):
         """
-        Updates a single salary record (fixed, percentage, bonus, write-off, comment).
+        Handles manual updates to a SalaryRecord from the detail modal.
+        Writes changes directly to the 'details' JSONField.
         """
         record = self.get_object()
-        details = request.data.get('details', {})
+        
+        new_details = request.data.get('details', {})
 
-        record.fixed_part = Decimal(details.get('fixed', record.fixed_part))
-        record.percent_part = Decimal(details.get('percent', record.percent_part))
-        record.bonus_part = Decimal(details.get('bonus', record.bonus_part))
-        record.write_off = Decimal(details.get('write_off', record.write_off))
-        record.comment = details.get('comment', record.comment)
-
-        record.total_salary = record.fixed_part + record.percent_part + record.bonus_part - record.write_off
+        record.details = {**(record.details or {}), **new_details}
+        
+        fixed = Decimal(record.details.get('fixed', 0))
+        percent = Decimal(record.details.get('percent', 0))
+        bonus = Decimal(record.details.get('bonus', 0))
+        write_off = Decimal(record.details.get('write_off', 0))
+        record.total_salary = fixed + percent + bonus - write_off
+        
+        record.fixed_part = fixed
+        record.percent_part = percent
+        record.bonus_part = bonus
+        record.write_off = write_off
+        record.comment = record.details.get('comment', '')
         
         record.save()
         
         response_data = {
             "id": record.id,
             "total_salary": record.total_salary,
-            "details": {
-                "fixed": record.fixed_part,
-                "percent": record.percent_part,
-                "bonus": record.bonus_part,
-                "write_off": record.write_off,
-                "comment": record.comment,
-            }
+            "details": record.details 
         }
         return Response(response_data, status=status.HTTP_200_OK)
     
@@ -97,7 +98,10 @@ class SalaryRecordViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def recalculate(self, request):
         """
-        Recalculate salaries for month and year 
+        Recalculates all salaries for a given month and year.
+        
+        This action calls the `calculate_and_save_shift_salaries` service
+        for every shift in the specified month.
         """
         try:
             month = int(request.data.get('month'))
@@ -108,7 +112,7 @@ class SalaryRecordViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        print(f"--- Запущен пересчет ЗП за {month}/{year} ---")
+        logger.info(f"--- Salary recalculation started for {month}/{year} ---")
 
         shifts_to_recalculate = Shift.objects.filter(
             date__year=year,
@@ -116,9 +120,9 @@ class SalaryRecordViewSet(viewsets.ModelViewSet):
         )
 
         if not shifts_to_recalculate.exists():
-            print("--- Смены для пересчета не найдены ---")
+            logger.warning("--- No shifts found for recalculation ---")
             return Response(
-                {"message": "Смены в этом месяце не найдены."},
+                {"message": "No shifts found for this month."},
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -128,15 +132,15 @@ class SalaryRecordViewSet(viewsets.ModelViewSet):
             try:
                 calculate_and_save_shift_salaries(shift=shift)
                 
-                print(f"Пересчет для смены {shift.id} за {shift.date}")
+                logger.info(f"Recalculating shift {shift.id} for {shift.date}")
                 processed_count += 1
                 
             except Exception as e:
-                print(f"ОШИБКА пересчета для смены {shift.id}: {e}")
+                logger.error(f"ERROR recalculating shift {shift.id}: {e}")
 
-        print(f"--- Пересчет завершен. Обработано смен: {processed_count} ---")
+        logger.info(f"--- Recalculation finished. Processed shifts: {processed_count} ---")
         return Response(
-            {"message": f"Пересчет завершен. Обработано смен: {processed_count}"},
+            {"message": f"Recalculation finished. Processed shifts: {processed_count}"},
             status=status.HTTP_200_OK
         )
 

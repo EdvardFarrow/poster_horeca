@@ -64,6 +64,7 @@ class SalaryRecord(models.Model):
     bonus_part = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     write_off = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     comment = models.CharField(max_length=225, blank=True)
+    details = models.JSONField(null=True, blank=True, default=dict, verbose_name="Detail (JSON)")
 
     created_at = models.DateTimeField(auto_now_add=True,)
     updated_at = models.DateTimeField(auto_now=True,)

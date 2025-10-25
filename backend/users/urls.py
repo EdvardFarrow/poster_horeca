@@ -9,7 +9,8 @@ from .views import (
     UserViewSet, 
     MeView,
     EmployeeViewSet,
-    RoleViewSet
+    RoleViewSet,
+    PayGroupViewSet
     )
 
 from rest_framework.routers import DefaultRouter
@@ -21,6 +22,7 @@ router.register(r'users', UserViewSet, basename='user')
 emp_role_router = DefaultRouter()
 emp_role_router.register(r'employee', EmployeeViewSet, basename='employee')
 emp_role_router.register(r'role', RoleViewSet, basename='role')
+emp_role_router.register(r'pay-group', PayGroupViewSet, basename='pay-group')
 
 
 

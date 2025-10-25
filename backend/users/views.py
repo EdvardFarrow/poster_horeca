@@ -4,12 +4,14 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .models import (
-    Employee, 
+    Employee,
+    PayGroup, 
     Role, 
     User
     )
 from .serializers import (
-    EmployeeSerializer, 
+    EmployeeSerializer,
+    PayGroupSerializer, 
     RegisterSerializer, 
     RoleSerializer,
     UserSerializer
@@ -42,3 +44,8 @@ class RoleViewSet(viewsets.ModelViewSet):
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer        
+    
+    
+class PayGroupViewSet(viewsets.ModelViewSet):
+    queryset = PayGroup.objects.all()
+    serializer_class = PayGroupSerializer    

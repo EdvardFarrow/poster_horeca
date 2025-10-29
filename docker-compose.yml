@@ -1,0 +1,50 @@
+version: '3.9'
+
+services: 
+
+  # Backend
+  backend:
+    build:
+      context: ./backend  # Dockerfile
+    command: gunicorn --bind 0.0.0.0:8000 backend.wsgi:application
+    volumes:
+      - ./backend:/app  
+    ports:
+      - "8000:8000"  
+    env_file:
+      - ./backend/.env  
+    depends_on:
+      - db
+      - redis
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend  # Говорим, где его Dockerfile
+    ports:
+      - "5173:5173"  # Прокидываем порт Vite
+    volumes:
+      - ./frontend:/app # Синхронизируем код для hot-reload
+      # "Исключение": не синхронизируем node_modules
+      # пусть используются те, что внутри контейнера
+      - /app/node_modules
+
+  # Database
+  db:
+    image: postgres:15-alpine  # Postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Save data to DB
+    env_file:
+      - ./backend/.env  
+    ports:
+      - "5432:5432"  
+  
+  # Redis
+  redis:
+    image: redis:alpine  # Redis
+    ports:
+      - "6379:6379"  
+
+# Defines the named volume to make Postgres data persistent
+volumes:
+  postgres_data:

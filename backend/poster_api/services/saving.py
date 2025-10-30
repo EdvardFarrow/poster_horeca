@@ -1,7 +1,7 @@
 from decimal import Decimal, InvalidOperation
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
-from django.utils import timezone
+# from django.utils import timezone
 from django.db import transaction
 
 
@@ -339,7 +339,7 @@ def save_products(products_data: list[dict]):
         
         if categories_to_process:
             category_instances = [
-                Category(category_id=cat_id, defaults={'category_name': data['category_name']})
+                Category(category_id=cat_id, category_name=data['category_name'])
                 for cat_id, data in categories_to_process.items()
             ]
             Category.objects.bulk_create(category_instances, ignore_conflicts=True)
@@ -409,8 +409,21 @@ def save_products_sales(products_data: list[dict]):
     if not products_data:
         logger.info("[save_products_sales] Received empty list. Nothing to process.")
         return
+    
+    valid_data = [
+        item for item in products_data 
+        if item.get('product_name') and item.get('category_name')
+    ]
+    
+    if len(valid_data) < len(products_data):
+        logger.warning(f"[save_products_sales] Filtered out {len(products_data) - len(valid_data)} items with missing name or category.")
 
-    serializer = ProductSalesAPISerializer(data=products_data, many=True)
+    if not valid_data:
+        logger.info("[save_products_sales] No valid data left after filtering.")
+        return
+    
+    
+    serializer = ProductSalesAPISerializer(data=valid_data, many=True)
     serializer.is_valid(raise_exception=True)
     validated_data = serializer.validated_data
 
@@ -501,8 +514,20 @@ def save_categories(categories_data: list[dict]):
     if not categories_data:
         logger.info("[save_categories] Received empty list of categories. Nothing to do.")
         return
+    
+    valid_data = [
+        item for item in categories_data
+        if item.get('category_name') 
+    ]
+    
+    if len(valid_data) < len(categories_data):
+        logger.warning(f"[save_categories_sales] Filtered out {len(categories_data) - len(valid_data)} items with missing category name.")
 
-    serializer = CategoryAPISerializer(data=categories_data, many=True)
+    if not valid_data:
+        logger.info("[save_categories_sales] No valid data left after filtering.")
+        return
+
+    serializer = CategoryAPISerializer(data=valid_data, many=True)
     serializer.is_valid(raise_exception=True)
     validated_data = serializer.validated_data
 
@@ -556,7 +581,21 @@ def save_categories_sales(categories_data: list[dict]):
         logger.info("[save_categories_sales] Received empty list. Nothing to process.")
         return
 
-    serializer = CategoriesSalesAPISerializer(data=categories_data, many=True)
+    
+    valid_data = [
+        item for item in categories_data
+        if item.get('category_name') 
+    ]
+    
+    if len(valid_data) < len(categories_data):
+        logger.warning(f"[save_categories_sales] Filtered out {len(categories_data) - len(valid_data)} items with missing category name.")
+
+    if not valid_data:
+        logger.info("[save_categories_sales] No valid data left after filtering.")
+        return
+    
+    
+    serializer = CategoriesSalesAPISerializer(data=valid_data, many=True)
     serializer.is_valid(raise_exception=True)
     validated_data = serializer.validated_data
 
@@ -634,7 +673,7 @@ def parse_poster_datetime(value: Any) -> Optional[datetime]:
 
     if isinstance(value, (int, float)):
         try:
-            if value > 1e12:
+            if value > 1e12: 
                 value /= 1000
             return datetime.fromtimestamp(value, tz=timezone.utc)
         except (ValueError, TypeError, OSError) as e:
@@ -643,10 +682,17 @@ def parse_poster_datetime(value: Any) -> Optional[datetime]:
 
     if isinstance(value, str):
         try:
+            num_value = float(value)
+            if num_value > 1e12: 
+                num_value /= 1000
+            return datetime.fromtimestamp(num_value, tz=timezone.utc)
+        except (ValueError, TypeError, OSError):
+            pass
+        try:
             naive_dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
             return naive_dt.replace(tzinfo=timezone.utc)
         except (ValueError, TypeError) as e:
-            logger.warning(f"Could not parse datetime string '{value}': {e}")
+            logger.warning(f"Could not parse datetime string '{value}' (as string or timestamp): {e}")
             return None
 
     logger.warning(f"Unsupported type for datetime parsing: {type(value)}")
@@ -735,12 +781,12 @@ def save_transaction_history(transaction_id: int, history_data: List[Dict]) -> i
         return 0
 
     try:
-        transaction = Transactions.objects.get(transaction_id=transaction_id)
+        tx_obj = Transactions.objects.get(transaction_id=transaction_id)
     except Transactions.DoesNotExist:
         logger.warning(f"Transaction {transaction_id} not found for history save")
         return 0
 
-    existing_history = TransactionHistory.objects.filter(transaction=transaction)
+    existing_history = TransactionHistory.objects.filter(transaction=tx_obj)
     
     existing_keys = {(h.type_history, h.time) for h in existing_history}
 
@@ -761,7 +807,7 @@ def save_transaction_history(transaction_id: int, history_data: List[Dict]) -> i
 
         history_to_create.append(
             TransactionHistory(
-                transaction=transaction,
+                transaction=tx_obj,
                 type_history=h.get("type_history"),
                 time=history_time,
                 value=float(h.get("value", 0)),

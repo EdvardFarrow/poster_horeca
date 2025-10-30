@@ -80,15 +80,13 @@ class ShiftViewSet(viewsets.ModelViewSet):
                 continue
 
             poster_shift = ShiftSale.objects.filter(date=date_obj).first()
-            if poster_shift:
-                poster_shift_id = str(poster_shift.shift_id)
-            else:
-                poster_shift_id = str(date_obj)  
+            poster_shift_id = poster_shift.shift_id if poster_shift else None
 
             shift = Shift.objects.create(
-                shift_id=poster_shift_id,
+                shift_id=poster_shift_id, 
                 date=date_obj,
             )
+            
             created_count += 1
             
             for emp_id in emp_ids:

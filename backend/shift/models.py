@@ -7,7 +7,7 @@ class Shift(models.Model):
     """
     Represents a single work shift on a specific date.
     """
-    shift_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    shift_id = models.IntegerField(unique=True, null=True, blank=True)
     date = models.DateField(default='2025-10-01')
     employees = models.ManyToManyField(
         Employee,

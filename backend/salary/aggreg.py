@@ -125,43 +125,49 @@ def aggregate_sales(shift: Shift):
         logger.info(f"    Сотрудники в группе: {[se.employee.name for se in shift_employees_in_group]}")
         logger.info(f"    Активные правила: {[r.id for r in rules_for_this_group]}")
         
-        for rule in rules_for_this_group:
-            
-            percent = Decimal(rule.percent or 0) / 100
-            rule_workshops_ids = {w.id for w in rule.workshops.all()} 
-            bonuses_for_this_rule = srp_map.get(rule.id, {})
-            rule_products_names = set(bonuses_for_this_rule.keys())
-            
-            if percent > 0 or bonuses_for_this_rule:
-                logger.info(f"  Применяем правило {rule.id} (Роль: {rule.role.name})")
+        prepped_rules = []
+        for r in rules_for_this_group:
+            prepped_rules.append({
+                'rule': r,
+                'percent': Decimal(r.percent or 0) / 100,
+                'workshops': {w.id for w in r.workshops.all()},
+                'bonus_products': srp_map.get(r.id, {})
+            })
+
+        for (w_id_str, product_name), sale_data in sales_agg.items():
+            try:
+                w_id_int = int(w_id_str) 
+            except (ValueError, TypeError):
+                continue
+
+            product_sum = sale_data["sum"]
+            item_count = sale_data["count"]
+
+            count_added_to_breakdown = False
+
+            for p_rule in prepped_rules:
                 
-                for (w_id_str, product_name), sale_data in sales_agg.items():
-                    try:
-                        w_id_int = int(w_id_str) 
-                    except (ValueError, TypeError):
-                        continue
+                if w_id_int not in p_rule['workshops']:
+                    continue
+                
+                if p_rule['percent'] > 0:
+                    total_percent_for_group += product_sum * p_rule['percent']
+
+                bonus_per_item = p_rule['bonus_products'].get(product_name, Decimal(0))
+                
+                if bonus_per_item > 0:
+                    total_bonus_for_product = item_count * bonus_per_item
+                    total_bonus_for_group += total_bonus_for_product
                     
-                    if w_id_int not in rule_workshops_ids:
-                        continue
+                    breakdown = bonus_breakdown_map[product_name]
                     
-                    product_sum = sale_data["sum"]
-                    item_count = sale_data["count"]
+                    if not count_added_to_breakdown:
+                        breakdown['count'] += item_count
+                        count_added_to_breakdown = True 
+                    
+                    breakdown['total'] += total_bonus_for_product
 
-                    if percent > 0:
-                        total_percent_for_group += product_sum * percent
-
-                    if product_name in rule_products_names:
-                        bonus_per_item = bonuses_for_this_rule.get(product_name, Decimal(0))
-                        if bonus_per_item > 0:
-                            item_count = sale_data["count"]
-                            total_bonus_for_product = item_count * bonus_per_item
-                            total_bonus_for_group += item_count * bonus_per_item
-                            
-                            breakdown = bonus_breakdown_map[product_name]
-                            breakdown['count'] += item_count
-                            breakdown['total'] += total_bonus_for_product
-
-        logger.info(f"--- Итого для группы {group_name} (до 'костыля'): "
+        logger.info(f"--- Итого для группы {group_name}: "
                     f"Начислено % = {total_percent_for_group:.2f}. "
                     f"Начислено бонусов = {total_bonus_for_group:.2f} ---")
         

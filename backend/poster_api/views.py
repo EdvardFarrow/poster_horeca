@@ -91,7 +91,6 @@ class ShiftSalesView(viewsets.ViewSet):
             Response: A list of serialized shift sales data, including local DB IDs and aggregated sales items.
         """
         date_str = request.query_params.get('date') or dt.today().strftime('%Y-%m-%d')
-        
         spot_ids = request.query_params.getlist('spot_id', ['1', '2'])
         
         client = PosterAPIClient()
@@ -124,21 +123,18 @@ class ShiftSalesView(viewsets.ViewSet):
         poster_shift_ids = list(total_poster_data.keys())
         
         existing_shifts = ShiftSale.objects.filter(shift_id__in=poster_shift_ids)
-        
         shifts_map = {shift.shift_id: shift for shift in existing_shifts}
 
         serialized_data = []
-        date_obj = dt.strptime(date_str, '%Y-%m-%d').date()
 
         for shift_id, sales in total_poster_data.items():
+            
             shift_obj = shifts_map.get(str(shift_id)) 
-
-            if not shift_obj:
-                shift_obj = ShiftSale.objects.create(shift_id=shift_id, date=date_obj)
-                logger.info(f"Создана новая запись в БД для смены с ID: {shift_id}")
-
             serialized_data.append({
-                'shift_id': shift_obj.id, 
+                'shift_id': shift_obj.id if shift_obj else None, 
+                
+                'poster_shift_id': shift_id, 
+                
                 'regular': sales.get('regular', []),
                 'delivery': sales.get('delivery', []),
                 'difference': sales.get('difference', 0),

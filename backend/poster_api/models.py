@@ -111,7 +111,7 @@ class Transactions(models.Model):
     """
     Represents a single customer transaction (a 'check' or 'receipt').
     """
-    transaction_id = models.IntegerField(null=True, blank=True)
+    transaction_id = models.IntegerField(null=True, blank=True, unique=True)
     date_start = models.DateTimeField()
     date_close = models.DateTimeField()
     status = models.IntegerField(default=0)

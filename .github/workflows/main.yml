@@ -1,0 +1,64 @@
+name: Django CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: poster_user
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      # Поднимаем Redis для тестов
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r backend/requirements.txt
+
+    - name: Run Tests
+      env:
+        SECRET_KEY: 'test-secret-key-for-ci'
+        DEBUG: 'True'
+        DATABASE_URL: 'postgres://poster_user:password@localhost:5432/test_db'
+        REDIS_URL: 'redis://localhost:6379/0'
+        POSTER_API_URL: 'https://dummy-url.com'
+        POSTER_API_TOKEN: 'dummy-token'
+        ALLOWED_HOSTS: 'localhost,127.0.0.1'
+      run: |
+        cd backend
+        python manage.py test

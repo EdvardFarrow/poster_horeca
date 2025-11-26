@@ -1,3 +1,4 @@
+[![Django CI](https://github.com/EdvardFarrow/poster_horeca/actions/workflows/main.yml/badge.svg)](https://github.com/EdvardFarrow/poster_horeca/actions/workflows/main.yml)
 # 📊 Poster Horeca Payroll Engine
 
 An automated ETL and Payroll Calculation system designed for the restaurant industry. This solution integrates with the **Poster POS API** to fetch sales data, processes complex commission logic, and generates salary reports in real-time.

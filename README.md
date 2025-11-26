@@ -27,12 +27,23 @@ The system follows a modular monolith architecture with strict separation of con
 
 ## 📦 Installation & Setup
 
+To run the project locally, you need Docker and Docker Compose installed.
+
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone [https://github.com/EdvardFarrow/poster_horeca.git](https://github.com/EdvardFarrow/poster_horeca.git)
+cd poster_horeca
 
-# Build containers
-docker-compose up --build
+# 2. Setup environment variables
+# Copy the example config to the backend folder where Docker expects it
+cp .env.example backend/.env
 
-# Run migrations
+# 3. Build and run containers
+docker-compose up --build -d
+
+# 4. Run migrations
 docker-compose exec backend python manage.py migrate
+
+# 5. Create superuser (to access Admin panel)
+# Follow the prompts to create your admin account
+docker-compose exec backend python manage.py createsuperuser

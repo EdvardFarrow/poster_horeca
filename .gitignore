@@ -1,9 +1,33 @@
-# Python
-venv/
+# --- Python ---
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
 
-# Environment Variables
-backend/.env.vscode/
-.zip
+# --- Distribution / artifacts ---
+*.zip
+*.tar.gz
+
+# --- IDE settings ---
+.vscode/
+.idea/
+
+# --- AWS Elastic Beanstalk ---
+.elasticbeanstalk/
+.ebextensions/
+
+# --- PostgreSQL backups/dumps ---
+*.sql
+*.sql.gz
+*.dump
+
+# --- Docker data volumes ---
+postgres_data/
+pgdata/
+data/
+
+# --- OS generated files ---
+.DS_Store
+Thumbs.db

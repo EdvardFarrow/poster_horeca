@@ -59,6 +59,7 @@ jobs:
         POSTER_API_URL: 'https://dummy-url.com'
         POSTER_API_TOKEN: 'dummy-token'
         ALLOWED_HOSTS: 'localhost,127.0.0.1'
+        DB_SSL_REQUIRE: 'False'
       run: |
         cd backend
         python manage.py test

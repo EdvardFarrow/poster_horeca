@@ -17,7 +17,7 @@ const OwnerDashboard = () => {
         { id: "reports", label: "Отчёты", icon: <FileText size={18} /> },
         { id: "employees", label: "Сотрудники", icon: <Users size={18} /> },
         { id: "salaries", label: "Зарплата", icon: <DollarSignIcon size={18} /> },
-        { id: "roles", label: "Управл. ролями", icon: <UserCog size={18} /> },
+        { id: "roles", label: "Управл. ролями", icon: <Userog size={18} /> },
 
     ];
 

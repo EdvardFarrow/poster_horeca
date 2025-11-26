@@ -52,10 +52,10 @@ jobs:
 
     - name: Run Tests
       env:
-        SECRET_KEY: 'test-secret-key-for-ci'
+        DJANGO_SECRET_KEY: 'test-secret-key-for-ci'
         DEBUG: 'True'
         DATABASE_URL: 'postgres://poster_user:password@localhost:5432/test_db'
-        REDIS_URL: 'redis://localhost:6379/0'
+        CACHE_URL: 'redis://localhost:6379/0'
         POSTER_API_URL: 'https://dummy-url.com'
         POSTER_API_TOKEN: 'dummy-token'
         ALLOWED_HOSTS: 'localhost,127.0.0.1'

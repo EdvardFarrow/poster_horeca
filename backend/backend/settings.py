@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 from decouple import config, Csv
 from datetime import timedelta
@@ -101,7 +102,7 @@ DATABASES = {
     'default': dj_database_url.config(
         default=config('DATABASE_URL'),
         conn_max_age=600,
-        ssl_require=config('DB_SSL_REQUIRE', default=True, cast=bool)
+        ssl_require=False if os.getenv('GITHUB_ACTIONS') else config('DB_SSL_REQUIRE', default=True, cast=bool)
     )
 }
 

@@ -47,3 +47,27 @@ docker-compose exec backend python manage.py migrate
 # 5. Create superuser (to access Admin panel)
 # Follow the prompts to create your admin account
 docker-compose exec backend python manage.py createsuperuser
+```
+
+## 🔌 Access the Application
+
+Once the containers are running, you can access the system:
+
+* Admin Panel: http://localhost:8000/admin/
+
+  * Login with the superuser credentials you just created.
+
+* API Root: http://localhost:8000/api/
+
+## 🧪 Testing
+
+The project includes a comprehensive test suite covering the API client (with mocks), payroll calculation logic, and data ingestion services.
+
+To run tests inside the Docker container:
+```Bash
+docker-compose exec backend python manage.py test
+```
+
+## 📄 License
+
+This project is open-source and available under the MIT License.

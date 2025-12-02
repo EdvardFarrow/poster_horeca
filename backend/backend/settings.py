@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import os
 from pathlib import Path
+import sys
 from decouple import config, Csv
 from datetime import timedelta
 import dj_database_url 
@@ -219,3 +220,22 @@ if AWS_STORAGE_BUCKET_NAME:
 else:
     STATIC_URL = 'static/'
     STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+
+
+
+if 'test' in sys.argv:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'test_db.sqlite3',
+        }
+    }
+    
+    class DisableMigrations:
+        def __contains__(self, item):
+            return True
+        def __getitem__(self, item):
+            return None
+
+    MIGRATION_MODULES = DisableMigrations()

@@ -179,17 +179,18 @@ def aggregate_sales(shift: Shift):
             if num_to_split_between == 0:
                 continue
 
-            if isinstance(group_key, int):
-                logger.info(f" PayGroup: делим банк {num_to_split_between} раз.")
-                total_percent_for_group = total_percent_for_group / num_to_split_between
-                total_bonus_for_group = total_bonus_for_group / num_to_split_between
-                for product_name in bonus_breakdown_map:
-                    bonus_breakdown_map[product_name]['total'] /= num_to_split_between
-            else:
-                logger.info(f" Стандартная роль.")
+            # if isinstance(group_key, int):
+            #     logger.info(f" PayGroup: делим банк {num_to_split_between} раз.")
+            #     total_percent_for_group = total_percent_for_group / num_to_split_between
+            #     total_bonus_for_group = total_bonus_for_group / num_to_split_between
+            #     for product_name in bonus_breakdown_map:
+            #         bonus_breakdown_map[product_name]['total'] /= num_to_split_between
+            # else:
+            #     logger.info(f" Стандартная роль.")
 
             percent_per_employee = total_percent_for_group / num_to_split_between
             bonus_per_employee = total_bonus_for_group / num_to_split_between
+            
             final_bonus_breakdown = [
                 {'product_name': name, 'count': data['count'], 'total': data['total']}
                 for name, data in bonus_breakdown_map.items()

@@ -421,8 +421,7 @@ def save_products_sales(products_data: list[dict]):
     if not valid_data:
         logger.info("[save_products_sales] No valid data left after filtering.")
         return
-    
-    
+
     serializer = ProductSalesAPISerializer(data=valid_data, many=True)
     serializer.is_valid(raise_exception=True)
     validated_data = serializer.validated_data
@@ -432,25 +431,40 @@ def save_products_sales(products_data: list[dict]):
             item['category_id']: {'name': item['category_name']}
             for item in validated_data if 'category_id' in item and 'category_name' in item
         }
+        
         if categories_to_process:
             category_instances = [
-                Category(category_id=cat_id, name=data['name'])
+                Category(category_id=cat_id, category_name=data['name'])
                 for cat_id, data in categories_to_process.items()
             ]
             Category.objects.bulk_create(category_instances, ignore_conflicts=True)
         
         category_map = {c.category_id: c for c in Category.objects.filter(category_id__in=categories_to_process.keys())}
 
-        product_ids = {item['product_id'] for item in validated_data}
-        existing_products = {p.product_id: p for p in Product.objects.filter(product_id__in=product_ids)}
+        all_product_ids = set()
+        for item in validated_data:
+            try:
+                all_product_ids.add(int(item['product_id']))
+            except (ValueError, TypeError):
+                continue
+
+        existing_products_qs = Product.objects.filter(product_id__in=list(all_product_ids))
+        existing_products_map = {int(p.product_id): p for p in existing_products_qs}
         
         products_to_create = []
+        seen_ids_in_batch = set()
+
         for item in validated_data:
-            if item['product_id'] not in existing_products:
+            try:
+                p_id = int(item['product_id'])
+            except (ValueError, TypeError):
+                continue
+
+            if p_id not in existing_products_map and p_id not in seen_ids_in_batch:
                 category_obj = category_map.get(item.get('category_id'))
                 products_to_create.append(
                     Product(
-                        product_id=item['product_id'],
+                        product_id=p_id, 
                         product_name=item.get("name"),
                         category=category_obj,
                         cost=item.get("price", 0),
@@ -458,26 +472,35 @@ def save_products_sales(products_data: list[dict]):
                         workshop=0
                     )
                 )
+                seen_ids_in_batch.add(p_id)
         
         if products_to_create:
             Product.objects.bulk_create(products_to_create, ignore_conflicts=True)
             logger.info(f"[save_products_sales] Created {len(products_to_create)} new products.")
 
-        product_map = {p.product_id: p for p in Product.objects.filter(product_id__in=product_ids)}
+        final_products_qs = Product.objects.filter(product_id__in=list(all_product_ids))
+        product_map = {int(p.product_id): p for p in final_products_qs}
         
-        existing_sales = {s.product_id: s for s in ProductSales.objects.filter(product_id__in=product_ids)}
+        existing_sales_qs = ProductSales.objects.filter(product__product_id__in=list(all_product_ids))
+        existing_sales = {int(s.product.product_id): s for s in existing_sales_qs}
         
         sales_to_create = []
         sales_to_update = []
         
         for item in validated_data:
-            product_obj = product_map.get(item['product_id'])
+            try:
+                p_id = int(item['product_id'])
+            except (ValueError, TypeError):
+                continue
+            
+            product_obj = product_map.get(p_id)
+            
             if not product_obj:
                 logger.warning(f"[save_products_sales] Could not find or create product with id {item['product_id']}. Skipping sale.")
                 continue
-
-            if product_obj.product_id in existing_sales:
-                sale_obj = existing_sales[product_obj.product_id]
+            
+            if p_id in existing_sales:
+                sale_obj = existing_sales[p_id]
                 sale_obj.product_profit = item.get("product_profit", 0)
                 sale_obj.count = int(item.get("count", 0))
                 sales_to_update.append(sale_obj)
@@ -497,7 +520,7 @@ def save_products_sales(products_data: list[dict]):
         if sales_to_update:
             ProductSales.objects.bulk_update(sales_to_update, ["product_profit", "count"])
             logger.info(f"[save_products_sales] Updated {len(sales_to_update)} existing sales records.")
-
+            
 
 @timing_decorator
 def save_categories(categories_data: list[dict]):
@@ -870,13 +893,11 @@ def save_transactions_products(products_data: List[Dict]):
         new_clients = [
             Clients(
                 client_id=cid,
-                defaults={
-                    "firstname": clients_to_create_data[cid].get("firstname", ""),
-                    "lastname": clients_to_create_data[cid].get("lastname", ""),
-                    "name": clients_to_create_data[cid].get("name"),
-                    "phone": clients_to_create_data[cid].get("phone"),
-                    "email": clients_to_create_data[cid].get("email"),
-                }
+                firstname=clients_to_create_data[cid].get("firstname", ""),
+                lastname=clients_to_create_data[cid].get("lastname", ""),
+                name=clients_to_create_data[cid].get("name"),
+                phone=clients_to_create_data[cid].get("phone"),
+                email=clients_to_create_data[cid].get("email"),
             ) for cid in new_client_ids
         ]
         if new_clients:

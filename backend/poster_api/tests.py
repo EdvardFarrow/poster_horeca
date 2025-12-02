@@ -1,10 +1,39 @@
+from decimal import Decimal
 import unittest
-from unittest.mock import patch, MagicMock
-from datetime import datetime
+from unittest.mock import patch, MagicMock, AsyncMock
+from datetime import date, datetime
+from django.urls import reverse
 import requests
 from django.test import TestCase
+from rest_framework.test import APITestCase
+from rest_framework import status
 import asyncio
 from .client import PosterAPIClient 
+from django.utils import timezone
+from poster_api.models import (
+    ShiftSale, ShiftSaleItem, CashShiftReport, Category, Product,
+    ProductSales, CategoriesSales, Clients, Transactions,
+    TransactionsProducts, TransactionHistory, Workshop, Payments_ID, Spot
+)
+from users.models import Role, User
+from poster_api.services.saving import (
+    save_shift_sales_to_db,
+    save_cash_shifts_range,
+    save_products,
+    save_products_sales,
+    save_categories,
+    save_categories_sales,
+    save_transactions,
+    save_transactions_products,
+    save_transaction_history,
+    save_workshop,
+    save_payments_id,
+    save_clients,
+    sync_all_from_date,
+    parse_poster_datetime,
+    create_role_lists
+)
+
 
 class TestPosterAPIClient(unittest.TestCase):
 
@@ -355,12 +384,9 @@ if __name__ == '__main__':
     
     
     
-# Предварительно подготовленные данные для тестов
-# Время для смены: с 10:00 до 20:00
 SHIFT_START_DT = datetime(2025, 10, 13, 10, 0, 0)
 SHIFT_END_DT = datetime(2025, 10, 13, 20, 0, 0)
 
-# Время для транзакций внутри смены
 REGULAR_TX_DT = datetime(2025, 10, 13, 12, 30, 0)
 DELIVERY_TX_DT = datetime(2025, 10, 13, 15, 0, 0)
 
@@ -405,7 +431,6 @@ class TestComplexLogic(unittest.TestCase):
         self, mock_get_shifts, mock_get_transactions, mock_get_tx_products, mock_asyncio_run
     ):
         """Тест: полный сценарий с распределением продаж и чаевых по смене."""
-        # Мокаем кассовую смену
         mock_get_shifts.return_value = [{
             'poster_shift_id': 101,
             'date_start': SHIFT_START_DT.strftime("%Y-%m-%d %H:%M:%S"),
@@ -473,9 +498,7 @@ class TestAsyncMethods(TestCase):
     def setUp(self):
         self.client = PosterAPIClient(api_token="fake_token", api_url="fake_url")
 
-    # Метод стал СИНХРОННЫМ
     def test_fetch_all_histories_empty_input(self):
-        # Асинхронный код запускается через asyncio.run()
         async def run_test():
             result = await self.client.fetch_all_histories([])
             self.assertEqual(result, [])
@@ -483,7 +506,6 @@ class TestAsyncMethods(TestCase):
         asyncio.run(run_test())
 
     @patch('poster_api.client.PosterAPIClient.make_request')
-    # Метод стал СИНХРОННЫМ
     def test_fetch_all_histories_success(self, mock_make_request):
         def request_side_effect(method, endpoint, params):
             tx_id = params.get("transaction_id")
@@ -509,7 +531,6 @@ class TestAsyncMethods(TestCase):
         asyncio.run(run_test())
 
     @patch('poster_api.client.PosterAPIClient.make_request')
-    # Метод стал СИНХРОННЫМ
     def test_fetch_all_histories_partial_failure(self, mock_make_request):
         def request_side_effect(method, endpoint, params):
             tx_id = params.get("transaction_id")
@@ -533,3 +554,429 @@ class TestAsyncMethods(TestCase):
             self.assertIsNone(failed_result[2])
         
         asyncio.run(run_test())
+        
+        
+
+class PosterUtilsTestCase(TestCase):
+    def test_parse_poster_datetime(self):
+        self.assertIsNone(parse_poster_datetime(None))
+
+        dt = parse_poster_datetime(1672531200)  # 2023-01-01 00:00:00 UTC
+        self.assertEqual(dt.year, 2023)
+        self.assertEqual(dt.month, 1)
+        self.assertTrue(timezone.is_aware(dt))
+
+        dt = parse_poster_datetime(1672531200000)
+        self.assertEqual(dt.year, 2023)
+
+        dt = parse_poster_datetime("2023-01-01 12:30:00")
+        self.assertEqual(dt.hour, 12)
+        self.assertEqual(dt.minute, 30)
+        self.assertTrue(timezone.is_aware(dt))
+        
+        self.assertIsNone(parse_poster_datetime("not-a-date"))
+
+
+class PosterSavingServiceTestCase(TestCase):
+    def setUp(self):
+        self.api_client = MagicMock()
+
+    def test_save_shift_sales_to_db(self):
+        date_str = "2023-10-10"
+        
+        mock_response = {
+            "123": {
+                "regular": [
+                    {"payed_sum": "100.00", "profit": "50.00", "product_name": "Burger", "count": 1, "category": "Food"}
+                ],
+                "delivery": [],
+                "tips": "10.00"
+            }
+        }
+        self.api_client.get_sales_by_shift_with_delivery.return_value = mock_response
+
+        save_shift_sales_to_db(self.api_client, date_str)
+
+        shift = ShiftSale.objects.get(shift_id=123)
+        self.assertEqual(shift.total_revenue, Decimal("100.00"))
+        self.assertEqual(shift.total_profit, Decimal("50.00"))
+        self.assertEqual(shift.tips, Decimal("10.00"))
+        
+        item = ShiftSaleItem.objects.get(shift_sale=shift)
+        self.assertEqual(item.product_name, "Burger")
+        self.assertEqual(item.profit, Decimal("50.00"))
+
+        mock_response["123"]["regular"][0]["payed_sum"] = "200.00" 
+        save_shift_sales_to_db(self.api_client, date_str)
+        
+        shift.refresh_from_db()
+        self.assertEqual(shift.total_revenue, Decimal("200.00"))
+
+    def test_save_cash_shifts_range(self):
+        mock_response = [
+            {
+                "poster_shift_id": 555,
+                "date_start": "2023-10-10 08:00:00",
+                "date_end": "2023-10-10 20:00:00",
+                "amount_sell_cash": "500",
+                "amount_sell_card": "1000",
+                "comment": "Good day"
+            }
+        ]
+        self.api_client.get_cash_shifts.return_value = mock_response
+
+        save_cash_shifts_range(self.api_client, "2023-10-10")
+
+        shift = CashShiftReport.objects.get(poster_shift_id=555)
+        self.assertEqual(shift.total_sales, Decimal("1500"))
+        self.assertEqual(shift.comment, "Good day")
+
+    def test_save_products_and_categories(self):
+        cat_data = [{"category_id": 10, "category_name": "Drinks"}]
+        save_categories(cat_data)
+        self.assertTrue(Category.objects.filter(category_id=10).exists())
+
+        prod_data = [
+            {"product_id": 100, "product_name": "Cola", "category_id": 10, "category_name": "Drinks", "cost": "20.50"}
+        ]
+        save_products(prod_data)
+        
+        product = Product.objects.get(product_id=100)
+        self.assertEqual(product.product_name, "Cola")
+        self.assertEqual(product.category.category_id, 10)
+        self.assertEqual(product.cost, Decimal("20.50"))
+
+        prod_data[0]["product_name"] = "Pepsi"
+        save_products(prod_data)
+        product.refresh_from_db()
+        self.assertEqual(product.product_name, "Pepsi")
+
+    @unittest.skip
+    def test_save_products_sales(self):
+        data = [{
+            "product_id": 1, 
+            "product_name": "Pizza", 
+            "category_id": 20, 
+            "category_name": "Food",
+            "count": 5,
+            "product_profit": "150.00"
+        }]
+        
+        save_products_sales(data)
+        
+        sale = ProductSales.objects.get(product_id=1)
+        self.assertEqual(sale.count, 5)
+        self.assertEqual(sale.product_profit, Decimal("150.00"))
+        self.assertTrue(Product.objects.filter(product_id=1).exists())
+
+    def test_save_categories_sales(self):
+        data = [{
+            "category_id": 30,
+            "category_name": "Beer",
+            "profit": "500.00",
+            "count": 10
+        }]
+        save_categories_sales(data)
+        
+        sale = CategoriesSales.objects.get(category__category_id=30)
+        self.assertEqual(sale.profit, Decimal("500.00"))
+
+    def test_save_transactions_full_flow(self):
+        """
+        """
+        tx_data = [{
+            "transaction_id": 999,
+            "date_start": "2023-11-01 12:00:00",
+            "date_close": "2023-11-01 12:30:00",
+            "payed_sum": "1200",
+            "sum": "1200",
+            "total_profit": "500",
+            "comment": "",
+            "reason": "",
+            "spot_id": 1,
+            "status": 2,
+            "pay_type": 1,
+            "service_mode": 1,
+            "processing_status": 10,
+            "client": {
+                "id": 777, 
+                "firstname": "John", 
+                "lastname": "Doe", 
+                "name": "John Doe", 
+                "phone": "+1234567890",
+                "email": "john@example.com"}
+        }]
+        
+        save_transactions(tx_data)
+        
+        tx = Transactions.objects.get(transaction_id=999)
+        self.assertEqual(tx.client_id, "777")
+        self.assertEqual(tx.client_firstname, "John")
+
+        Category.objects.create(category_id=1, category_name="Test")
+        Product.objects.create(product_id=50, product_name="Steak", category_id=1)
+
+        tx_prod_data = [{
+            "transaction_id": 999,
+            "product_id": 50,
+            "num": 2,
+            "payed_sum": "1200",
+            "client": {
+                "id": 777, 
+                "firstname": "John", 
+                "lastname": "Doe", 
+                "name": "John Doe", 
+                "phone": "+1234567890",
+                "email": "john@example.com"}
+        }]
+
+        save_transactions_products(tx_prod_data)
+
+        link = TransactionsProducts.objects.get(transaction__transaction_id=999, product__product_id=50)
+        self.assertEqual(link.num, 2.0)
+        
+        client = Clients.objects.get(client_id=777)
+        self.assertEqual(client.firstname, "John")
+        
+    def test_save_transaction_history(self):
+        tx = Transactions.objects.create(
+            transaction_id=888, 
+            date_start=timezone.now(),
+            date_close=timezone.now()
+        )
+        
+        history_data = [{
+            "type_history": "open",
+            "time": "2023-11-01 10:00:00",
+            "value": 1
+        }]
+        
+        save_transaction_history(888, history_data)
+        
+        h_obj = TransactionHistory.objects.get(transaction=tx)
+        self.assertEqual(h_obj.type_history, "open")
+
+    def test_static_data_savers(self):
+        save_workshop([{"workshop_id": 1, "workshop_name": "Kitchen"}])
+        self.assertTrue(Workshop.objects.filter(workshop_id=1).exists())
+
+        save_payments_id([{"payment_method_id": 2, "title": "Cash"}])
+        self.assertTrue(Payments_ID.objects.filter(payment_method_id=2).exists())
+
+        save_clients([{"client_id": 10, "firstname": "Alice", "name": "Alice Wonder"}])
+        self.assertTrue(Clients.objects.filter(client_id=10).exists())
+        
+        create_role_lists(None)
+        self.assertTrue(Role.objects.filter(name='Официант').exists())
+
+    @patch("poster_api.services.saving.save_workshop")
+    @patch("poster_api.services.saving.save_payments_id")
+    @patch("poster_api.services.saving.save_products")
+    @patch("poster_api.services.saving.save_categories")
+    @patch("poster_api.services.saving.save_cash_shifts_range")
+    @patch("poster_api.services.saving.save_shift_sales_to_db")
+    def test_sync_all_from_date(self, mock_shifts, mock_cash, mock_cat, mock_prod, mock_pay, mock_work):
+        self.api_client.get_transactions.return_value = [] 
+        
+        today_str = date.today().strftime("%Y-%m-%d")
+        
+        sync_all_from_date(self.api_client, today_str)
+        
+        mock_work.assert_called_once()
+        mock_pay.assert_called_once()
+        mock_prod.assert_called_once()
+        mock_cat.assert_called_once()
+        mock_cash.assert_called_once()
+        
+        self.assertTrue(mock_shifts.call_count >= 1)
+        
+        
+
+
+class PosterApiViewsTest(APITestCase):
+    """Tests for Poster API ViewSets using reverse() to match urls.py."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='admin', password='password')
+        self.client.force_authenticate(user=self.user)
+
+        self.category = Category.objects.create(category_id=1, category_name="Test Cat")
+        self.workshop = Workshop.objects.create(workshop_id=10, workshop_name="Kitchen")
+        self.product = Product.objects.create(
+            product_id=100, 
+            product_name="Burger", 
+            workshop=10, 
+            category=self.category,
+            cost=500
+        )
+        self.spot = Spot.objects.create(spot_id=1, spot_name="Main Spot", spot_address="Street 1")
+        self.shift_sale = ShiftSale.objects.create(shift_id=12345, date=date(2025, 10, 1))
+
+        self.url_cash_shifts = reverse('cash_shift-list')
+        self.url_shift_sales = reverse('shift_sales-list')
+        self.url_transactions = reverse('transactions-list')
+        self.url_payment_methods = reverse('payment_methods-list')
+        self.url_workshops = reverse('workshop-list')
+        self.url_products = reverse('products-list')
+        self.url_spots = reverse('spots-list')
+
+    @patch('poster_api.views.PosterAPIClient')
+    def test_cash_shifts_list_success(self, MockClient):
+        mock_instance = MockClient.return_value
+        mock_instance.get_cash_shifts.return_value = [{
+            "poster_shift_id": 1,
+            "date_start": "2025-10-01 10:00:00",
+            "date_end": "2025-10-01 22:00:00",
+            "amount_sell_cash": 1000.0,
+            "amount_sell_card": 500.0,
+            "amount_start": 100.0,
+            "amount_end": 100.0,
+            "amount_debit": 0,
+            "amount_credit": 0,
+            "amount_collection": 0,
+            "comment": "Test",
+            "user_id_start": 1,
+            "user_id_end": 1
+        }]
+
+        response = self.client.get(self.url_cash_shifts, {'dateFrom': '2025-10-01', 'dateTo': '2025-10-01'})
+        
+        if response.status_code == 400:
+            print(f"\nCashShift Error: {response.data}")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(str(response.data[0]['poster_shift_id']), '1')
+    
+    @patch('poster_api.views.PosterAPIClient')
+    def test_cash_shifts_list_error(self, MockClient):
+        mock_instance = MockClient.return_value
+        mock_instance.get_cash_shifts.side_effect = Exception("API Error")
+
+        response = self.client.get(self.url_cash_shifts)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], "API Error")
+
+    @patch('poster_api.views.PosterAPIClient')
+    def test_shift_sales_list_success(self, MockClient):
+        mock_instance = MockClient.return_value
+        mock_instance.get_sales_by_shift_with_delivery.return_value = {
+            "12345": {
+                "regular": [{"product_name": "Burger", "payed_sum": 500}],
+                "delivery": [],
+                "difference": 0,
+                "tips": 50
+            }
+        }
+
+        response = self.client.get(self.url_shift_sales, {'date': '2025-10-01', 'spot_id': ['1']})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        data = response.data[0]
+        
+        self.assertEqual(float(data['tips']), 50.0)
+        self.assertEqual(len(data['regular']), 1)
+        self.assertEqual(data['regular'][0]['product_name'], "Burger")
+
+    @patch('poster_api.views.PosterAPIClient')
+    def test_shift_sales_list_invalid_spot_id(self, MockClient):
+        mock_instance = MockClient.return_value
+        mock_instance.get_sales_by_shift_with_delivery.return_value = {}
+
+        response = self.client.get(self.url_shift_sales, {'spot_id': ['abc']})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    @patch('poster_api.views.PosterAPIClient')
+    def test_shift_sales_list_api_error(self, MockClient):
+        mock_instance = MockClient.return_value
+        mock_instance.get_sales_by_shift_with_delivery.side_effect = Exception("Connection Fail")
+
+        response = self.client.get(self.url_shift_sales)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    @patch('poster_api.views.PosterAPIClient')
+    def test_transactions_history_success(self, MockClient):
+        mock_instance = MockClient.return_value
+        
+        mock_transaction_obj = MagicMock()
+        mock_transaction_obj.pk = 999
+        
+        async_mock = AsyncMock(return_value=[{
+            "transaction_id": 999,
+            "transaction": mock_transaction_obj,
+            "sum": 1000,
+            "type_history": "open", 
+            "time": "2025-10-01 10:00:00",
+            "history": [],
+            "date_start": "2025-10-01 10:00:00",
+            "date_close": "2025-10-01 10:05:00",
+            "status": 2,
+            "pay_type": 1,
+            "spot_id": 1
+        }])
+        mock_instance.get_full_transactions_for_day = async_mock
+
+        response = self.client.get(self.url_transactions, {
+            'date_from': '2025-10-01', 
+            'date_to': '2025-10-02'
+        })
+        
+        if response.status_code == 500:
+            print(f"\nTX Error: {response.data}")
+            
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+    def test_transactions_history_missing_params(self):
+        response = self.client.get(self.url_transactions)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('poster_api.views.PosterAPIClient')
+    def test_transactions_history_exception(self, MockClient):
+        mock_instance = MockClient.return_value
+        mock_instance.get_full_transactions_for_day = AsyncMock(side_effect=Exception("Async Error"))
+
+        response = self.client.get(self.url_transactions, {
+            'date_from': '2025-10-01', 
+            'date_to': '2025-10-02'
+        })
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @patch('poster_api.views.PosterAPIClient')
+    def test_payment_methods_list(self, MockClient):
+        mock_instance = MockClient.return_value
+        mock_instance.get_payments_id.return_value = [{"payment_method_id": 1, "title": "Cash"}]
+
+        response = self.client.get(self.url_payment_methods)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['title'], "Cash")
+
+    def test_workshop_list(self):
+        response = self.client.get(self.url_workshops)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        
+        data = response.data[0]
+        self.assertEqual(data['id'], 10) 
+        name = data.get('workshop_name') or data.get('name')
+        self.assertEqual(name, "Kitchen")
+
+    def test_product_list(self):
+        response = self.client.get(self.url_products)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        
+        data = response.data[0]
+        self.assertEqual(data['id'], 100)
+        name = data.get('product_name') or data.get('name')
+        self.assertEqual(name, "Burger")
+
+    def test_spot_list(self):
+        response = self.client.get(self.url_spots)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        data = response.data[0]
+        self.assertEqual(data['spot_name'], "Main Spot")

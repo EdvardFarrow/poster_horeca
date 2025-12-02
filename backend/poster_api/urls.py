@@ -11,13 +11,13 @@ from .views import (
 )
 
 router = DefaultRouter()
-router.register(r'cash_shifts', CashShiftViewSet, basename='cashshift')
+router.register(r'cash_shifts', CashShiftViewSet, basename='cash_shift')
 router.register(r'shift_sales', ShiftSalesView, basename='shift_sales')
-router.register(r'transactions_history', TransactionsHistoryViewSet, basename='transactions_history')
-router.register(r'payment-methods', PaymentMethodsView, basename='payment-methods')
-router.register(r'poster_api_workshop', WorkshopViewSet, basename='workshop')
-router.register(r'poster_api_product', ProductViewSet, basename='product')
-router.register(r'spot', SpotViewSet, basename='spot')
+router.register(r'transactions', TransactionsHistoryViewSet, basename='transactions')
+router.register(r'payment_methods', PaymentMethodsView, basename='payment_methods')
+router.register(r'workshop', WorkshopViewSet, basename='workshop')
+router.register(r'products', ProductViewSet, basename='products')
+router.register(r'spots', SpotViewSet, basename='spots')
 
 
 urlpatterns = [

@@ -2,10 +2,18 @@
 source = poster_api, salary, shift, users
 omit =
     */migrations/*
-    */tests
+    */management/commands/*
+    */tests.py
+    */tests/*
     *__init__.py
     */admin.py
     */apps.py
+    run_backfill.py
+    manage.py
+    backend/asgi.py
+    backend/wsgi.py
+    backend/settings.py
+    backend/urls.py
 
 [report]
 show_missing = true

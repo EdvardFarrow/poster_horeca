@@ -1,3 +1,4 @@
+[![Django CI](https://github.com/EdvardFarrow/poster_horeca/actions/workflows/main.yml/badge.svg)](https://github.com/EdvardFarrow/poster_horeca/actions/workflows/main.yml)
 # 📊 Poster Horeca Payroll Engine
 
 An automated ETL and Payroll Calculation system designed for the restaurant industry. This solution integrates with the **Poster POS API** to fetch sales data, processes complex commission logic, and generates salary reports in real-time.
@@ -26,12 +27,47 @@ The system follows a modular monolith architecture with strict separation of con
 
 ## 📦 Installation & Setup
 
+To run the project locally, you need Docker and Docker Compose installed.
+
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone [https://github.com/EdvardFarrow/poster_horeca.git](https://github.com/EdvardFarrow/poster_horeca.git)
+cd poster_horeca
 
-# Build containers
-docker-compose up --build
+# 2. Setup environment variables
+# Copy the example config to the backend folder where Docker expects it
+cp .env.example backend/.env
 
-# Run migrations
+# 3. Build and run containers
+docker-compose up --build -d
+
+# 4. Run migrations
 docker-compose exec backend python manage.py migrate
+
+# 5. Create superuser (to access Admin panel)
+# Follow the prompts to create your admin account
+docker-compose exec backend python manage.py createsuperuser
+```
+
+## 🔌 Access the Application
+
+Once the containers are running, you can access the system:
+
+* Admin Panel: http://localhost:8000/admin/
+
+  * Login with the superuser credentials you just created.
+
+* API Root: http://localhost:8000/api/
+
+## 🧪 Testing
+
+The project includes a comprehensive test suite covering the API client (with mocks), payroll calculation logic, and data ingestion services.
+
+To run tests inside the Docker container:
+```Bash
+docker-compose exec backend python manage.py test
+```
+
+## 📄 License
+
+This project is open-source and available under the MIT License.

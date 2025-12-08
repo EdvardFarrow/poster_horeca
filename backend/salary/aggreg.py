@@ -11,20 +11,20 @@ logger = logging.getLogger(__name__)
 
 def aggregate_sales(shift: Shift):
     start_total = time.time()
-    logger.info(f"=== Начало агрегации ЗП для смены {shift.id} (Дата: {shift.date}) ===")
+    logger.info(f"=== Starting salary aggregation for shift {shift.id} (Date: {shift.date}) ===")
 
     try:
         shift_sale = ShiftSale.objects.get(shift_id=shift.shift_id)
     except ShiftSale.DoesNotExist:
-        logger.error(f"Не найден ShiftSale для shift_id {shift.shift_id}. Расчет невозможен.")
+        logger.error(f"ShiftSale not found for shift_id {shift.shift_id}. Calculation impossible.")
         return {}
 
     sales_qs = ShiftSaleItem.objects.filter(
         shift_sale=shift_sale,
         category_name='regular'
     )
-    logger.info(f"Найдено записей продаж (regular): {sales_qs.count()} "
-                f"для ShiftSale {shift_sale.id}")
+    logger.info(f"Found sales records (regular): {sales_qs.count()} "
+                f"for ShiftSale {shift_sale.id}")
 
     sales_agg = defaultdict(lambda: {'sum': Decimal(0), 'count': Decimal(0)})
     workshop_revenue_check = defaultdict(Decimal)
@@ -36,11 +36,11 @@ def aggregate_sales(shift: Shift):
         sales_agg[key]['count'] += Decimal(s.count)
         workshop_revenue_check[s.workshop] += sale_sum
 
-    logger.info(f"Агрегировано {len(sales_agg)} уникальных ключей (цех+продукт)")
+    logger.info(f"Aggregated {len(sales_agg)} unique keys (workshop+product)")
     
-    logger.info("--- ПРОВЕРКА ВЫРУЧКИ ПО ЦЕХАМ (до применения правил) ---")
+    logger.info("--- WORKSHOP REVENUE CHECK (before applying rules) ---")
     for w_id, total_sum in workshop_revenue_check.items():
-        logger.info(f"    Цех ID {w_id}: Общая выручка = {total_sum:.2f}")
+        logger.info(f"    Workshop ID {w_id}: Total revenue = {total_sum:.2f}")
     logger.info("------------------------------------------------------")
 
     role_rules = SalaryRule.objects.prefetch_related('workshops', 'role').all()
@@ -51,8 +51,8 @@ def aggregate_sales(shift: Shift):
     for srp in all_srp:
         srp_map[srp.salary_rule_id][srp.product.product_name.strip()] = Decimal(srp.fixed or 0)
 
-    logger.info(f"Всего правил ЗП загружено: {len(role_rules)}")
-    logger.info(f"Всего бонусных продуктов загружено: {len(all_srp)}")
+    logger.info(f"Total salary rules loaded: {len(role_rules)}")
+    logger.info(f"Total bonus products loaded: {len(all_srp)}")
 
     shift_employees = ShiftEmployee.objects.filter(
         shift=shift
@@ -79,11 +79,11 @@ def aggregate_sales(shift: Shift):
         else:
             employees_by_pay_group[f"role_{se.role_id}"].append(se)
 
-    logger.info(f"Сотрудников на смене: {len(shift_employees)}")
+    logger.info(f"Employees on shift: {len(shift_employees)}")
     for role_id, emps in employees_by_role_id.items():
         role_name = role_map[role_id].name
         emp_names = [e.name for e in emps]
-        logger.info(f"Роль {role_id} ({role_name}): {len(emps)} сотр. -> {emp_names}")
+        logger.info(f"Role {role_id} ({role_name}): {len(emps)} empl. -> {emp_names}")
 
     result = {}
     for role_id, employees in employees_by_role_id.items():
@@ -99,8 +99,8 @@ def aggregate_sales(shift: Shift):
                 "percent_total": Decimal(0),
                 "fixed_bonus_total": Decimal(0),
             }
-            logger.info(f"Сотрудник {emp.name} (ID {emp.id}) "
-                        f"получил фикс {fixed_per_shift} -> "
+            logger.info(f"Employee {emp.name} (ID {emp.id}) "
+                        f"received fixed {fixed_per_shift} -> "
                         f"total_salary={fixed_per_shift}")
 
     for group_key, shift_employees_in_group in employees_by_pay_group.items():
@@ -121,9 +121,9 @@ def aggregate_sales(shift: Shift):
             if first_role.pay_group:
                 group_name = f"PayGroup '{first_role.pay_group.name}'"
 
-        logger.info(f"--- Расчет для группы: {group_name} (Ключ: {group_key}) ---")
-        logger.info(f"    Сотрудники в группе: {[se.employee.name for se in shift_employees_in_group]}")
-        logger.info(f"    Активные правила: {[r.id for r in rules_for_this_group]}")
+        logger.info(f"--- Calculation for group: {group_name} (Key: {group_key}) ---")
+        logger.info(f"    Employees in group: {[se.employee.name for se in shift_employees_in_group]}")
+        logger.info(f"    Active rules: {[r.id for r in rules_for_this_group]}")
         
         prepped_rules = []
         for r in rules_for_this_group:
@@ -167,9 +167,9 @@ def aggregate_sales(shift: Shift):
                     
                     breakdown['total'] += total_bonus_for_product
 
-        logger.info(f"--- Итого для группы {group_name}: "
-                    f"Начислено % = {total_percent_for_group:.2f}. "
-                    f"Начислено бонусов = {total_bonus_for_group:.2f} ---")
+        logger.info(f"--- Total for group {group_name}: "
+                    f"Accrued % = {total_percent_for_group:.2f}. "
+                    f"Accrued bonuses = {total_bonus_for_group:.2f} ---")
         
         if total_percent_for_group > 0 or total_bonus_for_group > 0:
             
@@ -180,13 +180,13 @@ def aggregate_sales(shift: Shift):
                 continue
 
             # if isinstance(group_key, int):
-            #     logger.info(f" PayGroup: делим банк {num_to_split_between} раз.")
+            #     logger.info(f" PayGroup: splitting pot {num_to_split_between} times.")
             #     total_percent_for_group = total_percent_for_group / num_to_split_between
             #     total_bonus_for_group = total_bonus_for_group / num_to_split_between
             #     for product_name in bonus_breakdown_map:
-            #         bonus_breakdown_map[product_name]['total'] /= num_to_split_between
+            #          bonus_breakdown_map[product_name]['total'] /= num_to_split_between
             # else:
-            #     logger.info(f" Стандартная роль.")
+            #     logger.info(f" Standard role.")
 
             percent_per_employee = total_percent_for_group / num_to_split_between
             bonus_per_employee = total_bonus_for_group / num_to_split_between
@@ -196,9 +196,9 @@ def aggregate_sales(shift: Shift):
                 for name, data in bonus_breakdown_map.items()
             ]
             
-            logger.info(f"  Делим {total_percent_for_group:.2f} % и {total_bonus_for_group:.2f} бонусов "
-                        f"на {num_to_split_between} чел. = "
-                        f"{percent_per_employee:.2f} / {bonus_per_employee:.2f} на каждого.")
+            logger.info(f"  Splitting {total_percent_for_group:.2f} % and {total_bonus_for_group:.2f} bonuses "
+                        f"among {num_to_split_between} people = "
+                        f"{percent_per_employee:.2f} / {bonus_per_employee:.2f} each.")
 
             for emp in splitting_employees_list:
                 emp_key = emp.id
@@ -211,20 +211,20 @@ def aggregate_sales(shift: Shift):
                 result[emp_key]["details"]["bonus_breakdown"] = final_bonus_breakdown
                 
                 logger.info(
-                    f"  -> Сотрудник {emp.name} (ID {emp.id}): "
-                    f"начислено {percent_per_employee:.2f} + {bonus_per_employee:.2f}"
+                    f"  -> Employee {emp.name} (ID {emp.id}): "
+                    f"accrued {percent_per_employee:.2f} + {bonus_per_employee:.2f}"
                 )
     
-    logger.info("--- ИТОГОВЫЙ РАСЧЕТ ПО СОТРУДНИКАМ ---")
+    logger.info("--- FINAL CALCULATION BY EMPLOYEES ---")
     for emp_id, data in result.items():
         total = data["total_salary"]
         logger.info(
-            f"ИТОГ Сотрудник {data['employee'].name} (ID {emp_id}): "
-            f"фикс {data['details'].get('fixed', 0):.2f}, "
-            f"процент {data['percent_total']:.2f}, "
-            f"бонус {data['fixed_bonus_total']:.2f} -> "
-            f"ИТОГО {total:.2f}"
+            f"RESULT Employee {data['employee'].name} (ID {emp_id}): "
+            f"fixed {data['details'].get('fixed', 0):.2f}, "
+            f"percent {data['percent_total']:.2f}, "
+            f"bonus {data['fixed_bonus_total']:.2f} -> "
+            f"TOTAL {total:.2f}"
         )
 
-    logger.info(f"=== Конец агрегации для смены {shift.id} (время: {round(time.time()-start_total, 2)} сек) ===")
+    logger.info(f"=== End of aggregation for shift {shift.id} (time: {round(time.time()-start_total, 2)} sec) ===")
     return result
